@@ -5,6 +5,7 @@
   * [Introduction](#introduction)
   * [Preparation](#preparation)
     * [1-1. Linux and Bash, your important buddies for RNA-seq data analysis](#1-1-linux-and-bash-your-important-buddies-for-rna-seq-data-analysis)
+    * [1-2. Access the computing server](#1-2-access-the-computing-server)
   * Preprocessing of RNA-seq data
   * Analyze and compare RNA-seq data
 
