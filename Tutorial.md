@@ -1,8 +1,8 @@
-<style scoped>
+@settings{
 table {
   font-size: 0.8em;
 }
-</style>
+}
 
 # Tutorial for bulk RNA-seq data preprocessing and analysis
 #### Compiled by Zhisong He
