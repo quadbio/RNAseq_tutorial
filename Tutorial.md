@@ -1,6 +1,6 @@
 # Tutorial for bulk RNA-seq data preprocessing and analysis
 #### Compiled by Zhisong He
-#### Updated on 24 Aug 2022
+#### Updated on 29 Aug 2022
 ### Table of Content
   * [Introduction](#introduction)
   * [Preparation](#preparation)
@@ -8,7 +8,7 @@
     * [1-2. Access the computing server](#1-2-access-the-computing-server)
     * [1-3. Install the required tools with the help from conda](#1-3-install-the-required-tools-with-the-help-from-conda)
     * [1-4. Get the public RNA-seq data from SRA](#1-4-get-the-public-rna-seq-data-from-sra)
-  * Preprocessing of RNA-seq data
+  * [Preprocessing of RNA-seq data](#preprocessing-of-rna-seq-data)
   * Analyze and compare RNA-seq data
 
 ## Introduction
@@ -460,6 +460,22 @@ Once the download is finished, you can list the files in your working directory 
 $ ls -l *.fastq.gz
 -rwxrwx--- 1 hezhi@d.ethz.ch bsse-treutlein@d.ethz.ch 102401267 Aug 29 15:17 SRR2815952.fastq.gz
 -rwxrwx--- 1 hezhi@d.ethz.ch bsse-treutlein@d.ethz.ch 533150939 Aug 29 15:17 SRR2815954.fastq.gz
+
+...[skip the other lines]...
+
+$ ls -1 *.fastq.gz | wc -l
+25
 ```
+
+>**NOTE**
+>This example data set is single-ended RNA-seq data, therefore each sequencing run has only one FASTQ file. For the paired-ended RNA-seq data, each sequencing run is split into two FASTQ files, each for one mate. The filenames would be {SRR Accession}_1.fastq.gz and {SRR Accession}_2.fastq.gz.
+
+#### An introduction to the FASTQ data format
+[...]
+
+Now we have the tools ready, and the data ready. It is time to move on to the next step.
+
+## Preprocessing of RNA-seq data
+
 
 <style scoped> table { font-size: 0.8em; } </style>
