@@ -331,11 +331,135 @@ Now we have the computational environment ready for the preprocessing. We just n
 
 There are several huge repositories in the world for high-throughput sequencing data. The major players include [NCBI Sequence Read Archive (SRA)](https://www.ncbi.nlm.nih.gov/sra) by NCBI in the US, [European Nucleotide Archive (ENA)](https://www.ebi.ac.uk/ena/browser/home) by EMBL-EBI in the UK, and [DDBJ Sequence Read Archive (DRA)](https://www.ddbj.nig.ac.jp/dra/index-e.html) by the DDBJ Center in Japan. These three repositories are also members of International Nucleotide Sequence Database Collaboration (INSDC), and cross-backup each other, meaning that data submitted to any one of the three databases are also accessible from the other two.
 
->**Note**
+>**NOTE**
 >While majority of the high-throughput sequencing data are archived in these three databases, there are also other emerging sequencing data repositories, though most of them are regional, mostly used by researchers in the host country. Examples include [Genome Sequencing Archive (GSA)](https://ngdc.cncb.ac.cn/gsa/) by NGDC, and [CNGA Sequence Archive (CNSA)](https://db.cngb.org/cnsa/) by CNGB, both located in China.
 
 In this tutorial, we will retrieve the data we need from SRA. This is not only because the data we are going to use are archived at SRA, but also because of SRA-Toolkit which provides a simple way to download data given the accession numbers of the needed samples.
 
+#### The example data set
+The example data set used in this tutorial is from the paper [Comprehensive transcriptome analysis of neocortical layers in humans, chimpanzees and macaques](https://www.nature.com/articles/nn.4548) published in *Nature Neuroscience* in 2017. In the paper, the authors generated RNA-seq data representing the layer structure of prefrontal cortex in human, chimpanzee and rhesus macaque brains, aiming to identify human-specific transcriptome changes, which implies potential organizational rearrangement that specifically happened to human during evolution, and therefore contributed to the human specific features.
 
+As this tutorial is not to reproduce the result presented in the paper, but to introduce the general procedure of preprocessing and analyzing RNA-seq data, we are not going to use the whole dataset, but only the subset of human samples representing the purely sampled layers.
+
+To get the data, we firstly look at the paper. Nowadays most of the papers that involves large scale sequencing data also publish the accession number of the raw data. In most of the time, this information is included in sections like "Data availability", "Data and code availability" or "Accession codes". In this paper, there is indeed the "Accession codes" section:
+
+```
+Accessions
+BioProject
+PRJNA299472
+
+Sequence Read Archive
+SRP065273
+```
+
+#### Select the wanted samples via SRA Run Selector
+From there we know that the data was deposited in SRA, with the accession number SRP065273. Of course, this includes all the data mentioned in the paper, and therefore not only the human samples, but also the other species. In addition, the paper presented two data sets, with one being the main one covering all the three species (DS1) and a second one with human and rhesus macaque only for verification (DS2), and both data sets are involved in the same accession. How shall we easily get the data subset that we want now, i.e. the DS1 human samples that represent purely sampled layers?
+
+We can start with using [SRA Run Selector](https://www.ncbi.nlm.nih.gov/Traces/study/). It is an online tool by NCBI which can search for submitted SRA runs (usually means one round of sequencing of one sample) that are involved in the given accession. What's more it can do further interactive filtering based on certain metadata information of the samples.
+
+First, we search for everything under the accession SRP065273.
+<p align="center">
+<img src="img/run_selector_1.png">
+</p>
+
+The SRA Run Selector outputs all the related sequencing runs, with the linked metadata also included in the table. It also has the metadata and summary table of the accession. If we look at the left hand side, there is the "Filter List" block, where we can choose what metadata information to do subsetting.
+
+<p align="center">
+<img src="img/run_selector_2.png">
+</p>
+
+Let's select "Data_Set" from the Filters List box, then select only "ds1" from the appeared box. Next we further select "Organism" from the Filters List box, the then "homo sapiens".
+
+<p align="center">
+<img src="img/run_selector_3.png">
+</p>
+
+Now the item (meaning sequencing run) number is reduced from 273 to 72.
+
+However, because of the way of the sample collection, not all the samples purely represent one single layer of the cortex. Such information is unfortunately not included in the submitted metadata that we can directly see from the sample table. However, it is included in the paper, by integrating Figure 2 (for relationship between layers and the aligned sections) with the Supplementary Table 1 (for the aligned sections represented by each sample). Also since some layers are sampled more frequently than others due to the differences on their thickness,  Now we have a list of the 25 samples we will use.
+
+|Individual|Sample|Layer|
+|-----|-----|-----|
+|DS1_H1|DS1_H1_01|L1|
+|DS1_H1|DS1_H1_03|L2|
+|DS1_H1|DS1_H1_06|L3|
+|DS1_H1|DS1_H1_07|L4|
+|DS1_H1|DS1_H1_10|L5|
+|DS1_H1|DS1_H1_13|L6|
+|DS1_H1|DS1_H1_18|WM|
+|DS1_H2|DS1_H2_01|L1|
+|DS1_H2|DS1_H2_02|L2|
+|DS1_H2|DS1_H2_06|L3|
+|DS1_H2|DS1_H2_08|L4|
+|DS1_H2|DS1_H2_11|L5|
+|DS1_H2|DS1_H2_14|L6|
+|DS1_H2|DS1_H2_18|WM|
+|DS1_H3|DS1_H3_02|L2|
+|DS1_H3|DS1_H3_05|L3|
+|DS1_H3|DS1_H3_06|L4|
+|DS1_H3|DS1_H3_10|L5|
+|DS1_H3|DS1_H3_13|L6|
+|DS1_H3|DS1_H3_18|WM|
+|DS1_H4|DS1_H4_03|L3|
+|DS1_H4|DS1_H4_06|L4|
+|DS1_H4|DS1_H4_09|L5|
+|DS1_H4|DS1_H4_12|L6|
+|DS1_H4|DS1_H4_18|WM|
+
+>**NOTE**
+>This is actually a bad example of metadata preparation when submitting data to repositories, although not the worst scenario when it is impossible to retrieve the critical information in any way (this is unfortunately quite common). As the data submitter of the paper, I truely appologize for this.
+
+Now we can select those samples from the SRA Run Selector. After selecting only those samples, you can further switch on the "Selected" option at the "Select" block of the page to only show the selected samples in the item table and double check. Once confirmed, you can click on the "Metadata" and "Accession List" buttons at the "Download" column of the "Select" block, to download the complete metadata that you see in the item table (Metadata) and just the list of accessions of those samples (Accession List).
+
+<p align="center">
+<img src="img/run_selector_4.png">
+</p>
+
+#### Download the raw sequencing data in FASTQ format via SRA-Toolkit
+Now it is time to download the data. As mentioned above, SRA-Toolkit provides the functionalities to download data from SRA, given the list of SRA sequencing run accessions which we just obtained. And of course, we would like to do the download directly on the machine that will be used for the following preprocessing (e.g. the bs-studentsvr04 server). Since you probably just downloaded the accession list to your personal computer, you need to upload it to the machine. There are different options for that.
+
+You can just copy-paste the content of the accession list file. Open the accession list by any text editor on your computer, select all the context and then copy, and then login the server, go to your work folder (e.g. [the students folder]), and then create to paste all the content. For instance, you can use nano by `nano SRR_Acc_List.txt` to create the file "SRR_Acc_List.txt", then in the editor paste the text just copied with cmd+C for macOS or right-click at the PuTTY window if you are a Windows PuTTY user. After seeing all the accession numbers being pasted to nano, press ctrl+X (as indicated at the footnote menu, `^X Exit`. The character ^ in front of a Latin alphabet means pressing both the ctrl button and the other character button at the same time) for exit, and then press `Enter` to confirm the saving.
+
+Alternatively, you can directly transfer the file to the server. This sounds overkilling in this case but it is good to know how to do it as you may need to copy something much bigger to the server. For most of the servers supporting SSH access, it also supports data transfer via SFTP (Secure FTP, or File Transfer Protocol), or the `scp` command mentioned above if your personal computer is on macOS or Linux. The way of using `scp` is very similar to `cp`. The only difference is that you need to include your username and the hostname of the remote machine in the file name so that the command knows that the file source or target is at a remote computer. For example,
+
+```console
+scp Downloads/SRR_Acc_List.txt hezhi@bs-studentsvr04:/mnt/users/hezhi
+```
+In this case, the command will then ask for the password for logging in the bs-studentsvr04 machine with the username hezhi (this is my username. Don't forget to change it to yours). Type in the matched password (the same password as when logging in via ssh), and then the transfer will start, and the new copy will be at the `/mnt/users/hezhi` directory in the bs-studentsvr04 server.
+
+Once you get the accession list in the server, you can do the data download using SRA-Toolkit. The toolkit contains many different commands. Among them the most relevant ones include `prefetch`, `fastq-dump` and `fasterq-dump`. The `prefetch` commands can take a accession list file as the input and download the data of those accessions in the format of [SRA data format](https://www.ncbi.nlm.nih.gov/sra/docs/sra-data-formats/) which the SRA repository uses to store sequencing data. It is however not the standard data format of sequencing data that any genomic data processing tool will use. One can then use the `fastq-dump` command to convert the SRA files to the standard data format FASTQ, given all the downloaded SRA files with the glob pattern. 
+
+```console
+cd /mnt/users/hezhi
+prefetch --option-file SRR_Acc_List.txt
+fastq-dump --gzip --split-3 SRR*/*.sra
+```
+
+>**NOTE**
+>* The `prefetch` command saves the downloaded data of each sequencing run (i.e. every unique SRR accession) in a separated directory named by the SRR accession.
+>* When using `fastq-dump`, it is important to add the `--split-3` option, so that when the sequencing data is paired-ended, the two mates are automatically split.
+>* By default, the `fastq-dump` output the final FASTQ files in plain text which can be very large. Adding the `--gzip` option directly compresses the FASTQ files with gzip so that it becomes ~1/3 as big. It also means taking a bit longer time for the compression but to save the limited storage this is usually worthy.
+
+The alternative way is to use `fastq-dump` or `fasterq-dump` to download and convert to FASTQ files directly without the SRA intermediates. These two commands can both do the same work but some differences also exist. For instance, `fasterq-dump` allows multiple downloading threads which can very likely speed up the download. `fasterq-dump` also set the `--split-3` option as default so that you don't need to worry about forgetting it. On the other hand, the `--gzip` option is not supported in `fasterq-dump`, so you would have to explicitly run `gzip` later on the downloaded FASTQ files. In general, it is recommended to use `fasterq-dump` than `fastq-dump` but it doesn't really matter too much. One issue for both the commands is that they don't support the accession list file as the input, but expect the explicit given accessions, meaning something like
+```console
+fasterq-dump --threads 5 --progress SRR2815952 SRR2815954
+```
+
+>**NOTE**
+>In the `fasterq-dump` command, the `--threads` option specifies the number of downloading threads (by default 1, so no threading). The `--progress` option prints the downloading progress to the screen so that you know how much it has gone easily.
+
+This is a bit annoying as we don't want to type in many SRR accession numbers one by one manually. The solution here is to use the piping feature mentioned above together with the `cat` command to print content of a given list, and the `xargs` command that convert standard input into arguments of another command
+```console
+cat SRR_Acc_List.txt | xargs fasterq-dump --threads 5 --progress
+gzip *.fastq
+```
+
+Once the download is finished, you can list the files in your working directory and see whether you can all the files as expected. They should all be named as [SRR Accession].fastq.gz.
+
+```console
+$ ls -l *.fastq.gz
+-rwxrwx--- 1 hezhi@d.ethz.ch bsse-treutlein@d.ethz.ch 102401267 Aug 29 15:17 SRR2815952.fastq.gz
+-rwxrwx--- 1 hezhi@d.ethz.ch bsse-treutlein@d.ethz.ch 533150939 Aug 29 15:17 SRR2815954.fastq.gz
+```
 
 <style scoped> table { font-size: 0.8em; } </style>
