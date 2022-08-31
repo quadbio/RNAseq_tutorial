@@ -9,6 +9,8 @@
     * [1-3. Install the required tools with the help from conda](#1-3-install-the-required-tools-with-the-help-from-conda)
     * [1-4. Get the public RNA-seq data from SRA](#1-4-get-the-public-rna-seq-data-from-sra)
   * [Preprocessing of RNA-seq data](#preprocessing-of-rna-seq-data)
+    * [2-1 Quality control of RNA-seq data](#2-1-quality-control-of-rna-seq-data)
+    * [2-2 Read mapping/pseudomapping](#2-2-read-mappingpseudomapping)
   * Analyze and compare RNA-seq data
 
 ## Introduction
@@ -244,6 +246,9 @@ The PuTTY app has a GUI as following:
 
 The simplest and fastest way to start with is to put in the hostname of the server (bs-studentsvr04 for the student server for the Systems Genomics course), and then click on the "Open" button or type the Enter key directly, and it would open a terminal-like window where there is the text asking you to type in your username. Type in your username followed by Enter to input, it would then ask for your password. Enter your password, and if everything is alright, you will see things basically the same as the `ssh` example, suggesting a successful login.
 
+>***NOTE***
+>For some advanced Windows users, you may have heard of or been using the WSL (Windows Subsystem for Linux) system. Microsoft developed a compatibility layer for running Linux binary executables natively on a Windows system, and it is available in Windows 10 and Windows 11. From 2019, there is the MSL2 announced which introduced a real Linux kernel. It also supports different Linux distributions including Ubuntu, OpenSUSE and some others. If you have WSL in your Windows computer, you don't need to use PuTTY in principle, as you should directly have `ssh` installed as a part of your WSL. In that case, what you need to do is to simply open the WSL (e.g. search for Ubuntu in the start menu if that's the one you have), and then run `ssh` directly just as in macOS or Linux.
+
 No matter in which way, once you login the server successfully, you are ready to play around with it a bit with what have been shown above, and then continue to the next section.
 
 #### More information about the bs-studentsvr04 server
@@ -257,7 +262,7 @@ Now you have access to the server, and hopefully also know something about how t
 |SRA-Toolkit|https://github.com/ncbi/sra-tools/wiki|Retrieve data from SRA|UNIX/Unix-like, Win|
 |SRA Run Selector|https://www.ncbi.nlm.nih.gov/Traces/study/|Interactive filter and selection of SRA entries to obtain their metadata and accessions|Online|
 |FastQC|https://www.bioinformatics.babraham.ac.uk/projects/fastqc/|Quality control for the FASTQ files|UNIX/Unix-like, Win|
-|FASTX-Toolkit|http://hannonlab.cshl.edu/fastx\_toolkit/|FASTA/FASTQ file manipulation|UNIX/Unix-like|
+|Cutadapt|https://cutadapt.readthedocs.io/en/stable/index.html|Find and remove unwanted sequence from sequencing reads|UNIX/Unix-like, Win|
 |STAR|https://github.com/alexdobin/STAR|RNA-seq read mapping|UNIX/Unix-like|
 |kallisto|https://pachterlab.github.io/kallisto/|RNA-seq read pseudomapping|UNIX/Unix-like|
 |Samtools|http://www.htslib.org/|View and manipulate SAM/BAM files|UNIX/Unix-like|
@@ -267,7 +272,7 @@ Now you have access to the server, and hopefully also know something about how t
 
 The SRA Run Selector is a webtool that you can simply access using your browser (e.g. Google Chrome), so no installation is needed and you can simply use your personal computer for it.
 
-Some of those tools do not require too much effort to set up. They are either implemented with a cross-platform programming language (e.g. Java), or pre-compiled using the same or compatible system as the system used in the server. For those software, you can directly download it from the website to somewhere in the server (e.g. with `wget`), decompress it if needed (e.g. with `unzip` for .zip files, `gzip` for .gz files, `tar` for .tar, .tar.gz and .tar.bz files), and then there is the executable file available to run. This category includes FastQC (Java-based), SRA-Toolkit (pre-compiled) and FASTX-Toolkit (pre-compiled).
+Some of those tools do not require too much effort to set up. They are either implemented with a cross-platform programming language (e.g. Java), or pre-compiled using the same or compatible system as the system used in the server. For those software, you can directly download it from the website to somewhere in the server (e.g. with `wget`), decompress it if needed (e.g. with `unzip` for .zip files, `gzip` for .gz files, `tar` for .tar, .tar.gz and .tar.bz files), and then there is the executable file available to run. This category includes FastQC (Java-based) and SRA-Toolkit (pre-compiled).
 
 ```console
 cd [the students folder]
@@ -275,8 +280,7 @@ wget https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.9.zi
 unzip fastq_v0.11.9.zip
 wget https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/3.0.0/sratoolkit.3.0.0-centos_linux64.tar.gz
 tar xf sratoolkit.3.0.0-centos_linux64.tar.gz
-wget http://hannonlab.cshl.edu/fastx_toolkit/fastx_toolkit_0.0.13_binaries_Linux_2.6_amd64.tar.bz2
-tar xf fastx_toolkit_0.0.13_binaries_Linux_2.6_amd64.tar.bz2
+wget http://opengene.org/fastp/fastp.0.23.1
 ```
 
 For the others, the installation from scratch would not be the most pleasant work in the world. Unlike in Windows or macOS where one usually just need to run the installor of a software and follows the step-by-step guide to have it installed, a more common situation when using a Linux server as an ordinary user is that if you want to install a software, you need to download the source code, compile it, install the resulted executable command to somewhere that you have the access permission, and then tell the system to include that place into the searching path for command. Even when you don't run into any problem of dependency (e.g. one software may need another one which is not available in the system, so you would have to install the other one first), this is also a pain in the arse. If you are a system admin of the server (i.e. "sudoer", meaning the users who can use the command `sudo` to act as a root user that in principle can do anything on the system), you can probably install them quite easily by using the package manager repositories of the Linux system (if they are available). However, that would be unlike the case, and for sure won't happen if you use the student server for the Systems Genomics course. And even if you have the permission, it is usually the guideline to only install a software or package using the sudo permission when there is no alternative, so that the system can stay at the minimal scale for security and robustness.
@@ -313,12 +317,12 @@ your conda is either not installed successfully, or not yet properly initialized
 And once you have the conda installed and set up, it would be just one command to have the remaining tools installed.
 
 ```console
-conda install -c bioconda -c conda-forge star kallisto samtools rsem
+conda install -c bioconda -c conda-forge cutadapt star kallisto samtools rsem
 ```
 
 Indeed, you can install FastQC, SRA-Toolkit and FASTX-Toolkit also with conda
 ```console
-conda install -c bioconda -c conda-forge fastqc sra-tools fastx_toolkit
+conda install -c bioconda -c conda-forge fastqc sra-tools fastp
 ```
 
 It would ask you to confirm the installation of not only the four requested software but also all the dependencies. Once everything is finished, you can use the `which` command to make sure those tools are installed (e.g. `which STAR`).
@@ -520,6 +524,94 @@ Before actually processing the data, it is important to make sure that the data 
 
 The quality of a RNA-seq data contains different aspects. The sequencing quality, represented by the quality score for each base in each read, is one of the very first thing one should consider. It varies from one base to another base, and from one read to another. We can therefore look at the distribution of the Q score per loci across all reads. Usually the sequencing reads have relatively low quality on the two sides (especially the end) and higher quality in the middle, and this is the reason why we look at the per loci quality distribution across reads. Another reason to look at that is because if it is indeed the case that the start and/or the end of reads systematically have too low quality, one can easily fix it by trimming the first and the last bases of all the reads. This will be mentioned in more details later.
 
-Other quality metrics are more related to the sample and cDNA library quality. For instance, the adaptor ligantion is a critical part during the cDNA library preparation and cases can happen that multiple adaptors are ligated to the sequence and therefore become parts of the sequenced reads. This would introduce troubles later when we need to locate the transcript(s) that the read represents, as the extra adaptor sequences are not a part of the transcripts and would introduce a large mismatch. Another example is the complexity of the data. Ribosomal RNA (rRNA) makes up about 80% of cellular RNA, while the rRNA genes only makes up 0.5% of the human genome, and their abundances are not very relevant to many biological processes to study. Therefore, there is usually a step of mRNA enrichment (by Oligo-T sequences) or rRNA depletion to effectively capture the more informative non-rRNA transcript fractions. However, this is not always working efficiently and the cDNA library would present a low complexity if the rRNA portion is not effectively reduced. Also, there could be reads representing pure ligation products of multiple sequencing adaptor, which also dramatically reduce the library complexity.
+Other quality metrics are more related to the sample and cDNA library quality. For instance, the adapter ligantion is a critical part during the cDNA library preparation and cases can happen that multiple adapters are ligated to the sequence and therefore become parts of the sequenced reads. This would introduce troubles later when we need to locate the transcript(s) that the read represents, as the extra adapter sequences are not a part of the transcripts and would introduce a large mismatch. Another example is the complexity of the data. Ribosomal RNA (rRNA) makes up about 80% of cellular RNA, while the rRNA genes only makes up 0.5% of the human genome, and their abundances are not very relevant to many biological processes to study. Therefore, there is usually a step of mRNA enrichment (by Oligo-T sequences) or rRNA depletion to effectively capture the more informative non-rRNA transcript fractions. However, this is not always working efficiently and the cDNA library would present a low complexity if the rRNA portion is not effectively reduced. Also, there could be reads representing pure ligation products of multiple sequencing adapter, which also dramatically reduce the library complexity.
+
+[FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) is a tool providing a simple way to do some quality control checks on the sequencing data. It checks different aspect of data quality and provides a graphical report so that one can intuitively get the idea about the data quality. The tool contains both GUI and CLI, therefore one can choose to either run it by clicking buttons with mouse or with commands.
+
+To run it in the command line, it is very simple. This is an example:
+```console
+mkdir fastqc
+fastqc -o fastqc *.fastq.gz
+```
+>**NOTE**
+>The `-o` option in the `fastqc` command specifies the output directory to put the output files. By default it stores the output files to the same folder as the FASTQ files. In the example script, a new folder is created to store just the FastQC reports. This is not a must, but will likely help to make it more tidy.
+
+If you prefer GUI, you can also directly run `fastqc` to open the GUI in the server. If everything goes well you would be able to see the FastQC window poping up. Then you can open one or more FASTQ files by selecting from the menu `File` -> `Open...`. After getting the report that's shown in the window, you can save it, also two files just as the command line version, by choosing from the menu `File` -> `Save report...`.
+
+>**NOTE**
+>Please note that to see the GUI at your personal computer, you need to make the X11 forwarding possible. [X11](https://en.wikipedia.org/wiki/X_Window_System) is a windowing system for bitmap displays, proving the basic framework for a GUI environment and is commonly used in Linux. To allow the X11 to work via SSH-based remote access, there are several things one would need to do:
+>* For macOS users, make sure to add the `-Y` option when running the `ssh` command. It means to use `ssh -Y <username>@bs-studentsvr04` to login the bs-studentsvr04 server, for instance. Also, you need to make sure that XQuartz, the X11 system that runs on macOS, is installed.
+>* For Windows users using PuTTY, it is more complicated. First of all, you need to make sure that [Xming](http://www.straightrunning.com/XmingNotes/) or any other X11 server for Windows is installed, and being opened. And then in PuTTY, after filling in the server information at the starting page, from the option menu on the left hand side, choose "Connection" -> "SSH" -> "X11". There you shall click the "Enable X11 forwarding". Afterwards click the "Open" button to start the connection.
+>* The newest Xming is not free, but needs £10 "donation" to get the download password. Its older version, however, is available at [sourceforge.net](https://sourceforge.net/projects/xming/files/Xming/6.9.0.31/Xming-6-9-0-31-setup.exe/download) for free.
+
+For each FASTQ file there are two output files generated by default. Assume the FASTQ file is called `[filename].fastq` or `[filename].fastq.gz`, then one output file is called `[filename]_fastqc.html` and the other one called `[filename]_fastqc.zip`. The HTML file is a report which can be opened with your browser, and it contains the summary of all the quality metrics, as well as a grade by the software on each perspective whether it is passed, warning, or failed. The ZIP file, once decompressed, contains also the HTML report, as well as plain text files with the same information.
+
+This is an example screenshot of the HTML report when being opened in the browser:
+
+<p align="center"><img src="img/fastqc.png" /></p>
+
+It is important to mention that some of the grades are made assuming the data to be whole-genome DNA sequencing. For instance, the "Per sequence GC content" compares the distribution of G/C bases proportion per read to a theoretical distribution derived from the whole genome, which is expected to be different from the GC content of transcriptome. From my personal experience, the "Per base sequence content" and "Per sequence GC content" are the two sections that easily get the warning for failed grade for RNA-seq data, but can be ignored if other sections are fine. In addition, the "Sequence Duplication Levels" is another section that could give out warning of RNA-seq data, while it may or may not be a problem that needs to be solved later.
+
+Meanwhile, the sections that I would suggest to pay attention to for RNA-seq data include "Per base sequence quality", "Sequence Duplication Levels", "Overrepresented sequences" and "Adapter Content". They represent potential We will need to try to fix the problem if they get a failed grade:
+* If any read locus shows low quality (e.g. median <20 or even <10) in the "Per base sequence quality" section, especially at the two ends, we should try to trim them if the low-quality part is large (>10 bases), either by all reads removing the same number of bases or different number per read based on the quality scores.
+* Since different transcripts have very different abundance, to make sure that very lowly expressed transcripts are also detected, it is possible that the highly expressed transcripts are over-amplified and/or over-sequenced, resulting in warning of "Sequence Duplication Levels". In this case, a de-duplication step may be wanted to collapse the identical reads into one.
+* For standard mRNA-seq data with oligoT enrichment, problems of "Overrepresented sequences" and "Adapter Content" often come together and represent the adapter ligation issue mentioned above. We can try to cut the adapter sequences from reads later.
+
+For the example shown in the screenshot above, we don't need to do anything as it looks all good.
+
+**IMPORTANT NOTE**: It is not always necessary to do anything here even if problems were found, especially those related to base quality. For instance, many up-to-date software being used later for read mapping (e.g. STAR) has implemented a soft trimming mechanism to deal with low-quality bases at the end of a read.
+
+#### (Optional) Trimming and deduplication
+If it is really needed, fixing the first and the third problems requires cutting off parts of some/all reads in the data. There are quite some tools providing the functionality to do that, including [Cutadapt](https://cutadapt.readthedocs.io/en/stable/index.html) and [fastp](https://github.com/OpenGene/fastp). The fastp tool, although less famous and commonly used than Cutadapt, provides the de-duplication function altogether so that one can do trimming+deduplication at the same time.
+
+Let's firstly look at Cutadapt. It has a lot of functionalities related to do all kinds of trimming in pretty complicated manners. You can get all the details from its [online user guide](https://cutadapt.readthedocs.io/en/stable/guide.html). As an easy example, assuming the data being single-ended (SE), we can trim the adapter sequences in the data by using the following command:
+```console
+cutadapt --adapter=AGATCGGAAGAG --minimum-length=25 -o SRR2815952_trimmed.fastq.gz SRR2815952.fastq.gz 
+```
+
+For paired-ended (PE) reads, it is very similar 
+```console
+cutadapt -a=AGATCGGAAGAG -A=AGATCGGAAGAG --minimum-length=25 -o read_1_trimmed.fastq.gz -p read_2_trimmed.fastq.gz read_1.fastq.gz read_2.fastq.gz
+```
+
+>**NOTE**
+>* In both examples, the sequence AGATCGGAAGAG is the first 12 bases of the Illumina Universal Adapter. It is exactly one of the sequences that FastQC uses to evaluate adapter content. If there is a different adapter sequence being used, the related options should be changed accordingly.
+>* If the data is PE, make sure to provide both reads to trigger the PE trimming mode, so that the two paired reads are kept or removed together in a pair. This is important. For PE data the two reads are stored in two separated FASTQ files, but it is strictly required that reads in the two files have the same number of reads which are paired in the same order.
+
+As you can see above, the `cutadapt` command expects only one sample per time. When you have many samples, you need to either run it one-by-one manually, or you can rely on for-loop in the Bash scripting. For example, this is the script to apply the same trimming to all the fastq.gz files in the current folder, and store the trimmed FASTQ files in the new subdirectory called `trimmed`:
+```
+mkdir trimmed
+for file in *.fastq.gz; do
+  cutadapt --adapter=AGATCGGAAGAG --minimum-length=25 -o trimmed/$file $file
+done
+```
+
+Similar process can be done by using fastp, with the deduplication operation also applied.
+```console
+fastp --dedup --adapter_sequence AGATCGGAAGAG -l 25 -i SRR2815952.fastq.gz -o SRR2815952_trimmed_dedup.fastq.gz
+```
+
+And of course we can wrap it up and apply to all the .fastq.gz files in the folder using the for-loop in Bash
+```console
+mkdir trimmed_dedup
+for file in *.fastq.gz; do
+  fastp --dedup --adapter_sequence AGATCGGAAGAG -l 25 -i $file -o trimmed_dedup/$file
+done
+```
+
+Also to keep in mind that fastp is able to do more complicated manipulations and examples are shown in its [github page](https://github.com/OpenGene/fastp). It also provides a QC summary, not as comprehensive as FastQC does but still reasonable. However, we won't go into those details in this tutorial.
+
+## 2-2 Read mapping/pseudomapping
+Once the quality of the data is confirmed, we need to convert those millions of reads per sample into the gene- or transcript-level quantification. This would need the assignment of reads to genes or transcripts. To do this, the mostly common first step is for each read, to look for the genomic region that match with the read, given the complete genomic sequences. The identified region is then most likely the region being transcribed and generate the sequenced read in the end. This step of looking for the matched genomic regions for reads is called read genome mapping or alignment.
+
+There are different tools, or aligners, that have been developed for this purpose. The most famous examples include [Tophat/Tophat2](https://ccb.jhu.edu/software/tophat/index.shtml)/[HISAT2](https://daehwankimlab.github.io/hisat2/) and [STAR](https://github.com/alexdobin/STAR). As the commonly used modern aligners, HISAT2 and STAR shares quite some features, such as their high-efficiency, and their support of soft-trimming for low-quality bases at the ends of reads. They also have their own adventage and disadventage. HISAT2 uses fewer computational resource than STAR (particularly memory) and has better support for SNPs (single-nucleotide polymorphism) that in the same locus on the genome different individuals can have different nucleotides. On the other hand, STAR is suggested to provide more accurate alignment results. It also supports varied ways for the next step to quantify transcript abundance. In this tutorial, we will use STAR to map the FASTQ files we retreived from SRA to the human genome.
+
+#### Brief introduction to the STAR aligner
+
+#### Create genome index
+
+#### Mapping with STAR
+
+
 
 <style scoped> table { font-size: 0.8em; } </style>
