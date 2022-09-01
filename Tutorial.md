@@ -10,7 +10,8 @@
     * [1-4. Get the public RNA-seq data from SRA](#1-4-get-the-public-rna-seq-data-from-sra)
   * [Preprocessing of RNA-seq data](#preprocessing-of-rna-seq-data)
     * [2-1 Quality control of RNA-seq data](#2-1-quality-control-of-rna-seq-data)
-    * [2-2 Read mapping/pseudomapping](#2-2-read-mappingpseudomapping)
+    * [2-2 Read mapping/pseudomapping and quantification](#2-2-read-mappingpseudomapping-and-quantification)
+      * [2-2-1 Read mapping via STAR and data quantification](#2-2-1-read-mapping-via-star-and-data-quantification)
   * Analyze and compare RNA-seq data
 
 ## Introduction
@@ -276,6 +277,8 @@ Some of those tools do not require too much effort to set up. They are either im
 
 ```console
 cd [the students folder]
+mkdir tools
+cd tools
 wget https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.9.zip
 unzip fastq_v0.11.9.zip
 wget https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/3.0.0/sratoolkit.3.0.0-centos_linux64.tar.gz
@@ -293,6 +296,7 @@ To use conda, we need to firstly install conda in the server. We can download mi
 
 ```console
 cd [the students folder]
+cd tools
 wget https://repo.anaconda.com/miniconda/Miniconda3-py37_4.12.0-Linux-x86_64.sh
 bash Miniconda3-py37_4.12.0-Linux-x86_64.sh
 ```
@@ -434,8 +438,10 @@ In this case, the command will then ask for the password for logging in the bs-s
 Once you get the accession list in the server, you can do the data download using SRA-Toolkit. The toolkit contains many different commands. Among them the most relevant ones include `prefetch`, `fastq-dump` and `fasterq-dump`. The `prefetch` commands can take a accession list file as the input and download the data of those accessions in the format of [SRA data format](https://www.ncbi.nlm.nih.gov/sra/docs/sra-data-formats/) which the SRA repository uses to store sequencing data. It is however not the standard data format of sequencing data that any genomic data processing tool will use. One can then use the `fastq-dump` command to convert the SRA files to the standard data format FASTQ, given all the downloaded SRA files with the glob pattern. 
 
 ```console
-cd /mnt/users/hezhi
-prefetch --option-file SRR_Acc_List.txt
+cd [student folder]
+mkdir rawdata
+cd rawdata
+prefetch --option-file ../SRR_Acc_List.txt
 fastq-dump --gzip --split-3 SRR*/*.sra
 ```
 
@@ -454,7 +460,7 @@ fasterq-dump --threads 5 --progress SRR2815952 SRR2815954
 
 This is a bit annoying as we don't want to type in many SRR accession numbers one by one manually. The solution here is to use the piping feature mentioned above together with the `cat` command to print content of a given list, and the `xargs` command that convert standard input into arguments of another command
 ```console
-cat SRR_Acc_List.txt | xargs fasterq-dump --threads 5 --progress
+cat ../SRR_Acc_List.txt | xargs fasterq-dump --threads 5 --progress
 gzip *.fastq
 ```
 
@@ -530,6 +536,8 @@ Other quality metrics are more related to the sample and cDNA library quality. F
 
 To run it in the command line, it is very simple. This is an example:
 ```console
+cd [student folder]
+cd rawdata
 mkdir fastqc
 fastqc -o fastqc *.fastq.gz
 ```
@@ -601,7 +609,8 @@ done
 
 Also to keep in mind that fastp is able to do more complicated manipulations and examples are shown in its [github page](https://github.com/OpenGene/fastp). It also provides a QC summary, not as comprehensive as FastQC does but still reasonable. However, we won't go into those details in this tutorial.
 
-## 2-2 Read mapping/pseudomapping
+## 2-2 Read mapping/pseudomapping and quantification
+### 2-2-1 Read mapping via STAR and data quantification
 Once the quality of the data is confirmed, we need to convert those millions of reads per sample into the gene- or transcript-level quantification. This would need the assignment of reads to genes or transcripts. To do this, the mostly common first step is for each read, to look for the genomic region that match with the read, given the complete genomic sequences. The identified region is then most likely the region being transcribed and generate the sequenced read in the end. This step of looking for the matched genomic regions for reads is called read genome mapping or alignment.
 
 There are different tools, or aligners, that have been developed for this purpose. The most famous examples include [Tophat/Tophat2](https://ccb.jhu.edu/software/tophat/index.shtml)/[HISAT2](https://daehwankimlab.github.io/hisat2/) and [STAR](https://github.com/alexdobin/STAR). As the commonly used modern aligners, HISAT2 and STAR shares quite some features, such as their high-efficiency, and their support of soft-trimming for low-quality bases at the ends of reads. They also have their own adventage and disadventage. HISAT2 uses fewer computational resource than STAR (particularly memory) and has better support for SNPs (single-nucleotide polymorphism) that in the same locus on the genome different individuals can have different nucleotides. On the other hand, STAR is suggested to provide more accurate alignment results. It also supports varied ways for the next step to quantify transcript abundance. In this tutorial, we will use STAR to map the FASTQ files we retreived from SRA to the human genome.
@@ -624,7 +633,7 @@ After the seed search is done, STAR applies the second step, which is clustering
 
 More details information are available in the STAR paper (technical details in its Supplementary Materials).
 
-#### Download genome sequences and create genome index for STAR
+#### Download genome sequences and create indexed genome for STAR
 The seed search in STAR is implemented through uncompressed suffix arrays (SAs). We won't go into the details how SAs works, but STAR needs the reference genome to be represented in the form of SAs so that it can apply its seed search for the reads. Therefore, the first step of using STAR is actually to have your reference genome ready, and then use the "genomeGenerate" function in STAR to prepare SAs for it.
 
 So we need to firstly retrieve the reference genome. Specifically for the example data set, we need a human reference genome.
@@ -638,6 +647,8 @@ In the download page, data are grouped by species in mostly alphabetical order, 
 So now you can choose to download the file directly to your computer, and then transfer it to the server using the methods mentioned above (`scp` or SFTP), or directly download the data to the server. For the latter, you can use the `wget` command:
 ```console
 cd [student folder]
+mkdir genome
+cd genome
 wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
 ```
 
@@ -661,10 +672,51 @@ Sep 01 12:16:25 ..... started STAR run
 Sep 01 12:16:25 ... starting to generate Genome files
 Sep 01 12:17:25 ... starting to sort Suffix Array. This may take a long time...
 Sep 01 12:17:41 ... sorting Suffix Array chunks and saving them to disk...
+Sep 01 12:57:58 ... loading chunks from disk, packing SA...
+Sep 01 12:59:26 ... finished generating suffix array
+Sep 01 12:59:26 ... generating Suffix Array index
+Sep 01 13:07:15 ... completed Suffix Array index
+Sep 01 13:07:16 ... writing Genome to disk ...
+Sep 01 13:07:21 ... writing Suffix Array to disk ...
+Sep 01 13:08:08 ... writing SAindex to disk
+Sep 01 13:08:14 ..... finished successfully
 ```
 
 #### Mapping with STAR
-Once the genome indexing is done, you are ready to map the reads to the reference genome.
+Once the genome indexing is done, you are ready to map the reads to the reference genome with STAR. STAR has pretty good default mapping-related parameter settings, therefore, they can be kept as default for most ordinary RNA-seq data sets. Parameters that always need to be set properly are those related to the input and output files. This is the basic example script to run STAR on one of the sample in the example data set (no hurry to run, there is more to come :wink:):
+```console
+cd [student folder]
+mkdir mapping
+mkdir mapping/SRR2815952
+STAR --genomeDir genome/star-index \
+     --runThreadN 10 \
+     --readFilesIn rawdata/SRR2815952.fastq.gz \
+     --readFilesCommand zcat \
+     --outSAMtype BAM SortedByCoordinate \
+     --outFileNamePrefix mapping/SRR2815952/
+```
+
+>**NOTE**
+>The `\` character at the end of a line tells Bash that the next line is also a part of the same command. Without `\`, the end of a line automatically means the end of a command. This is a good way to do if you want to keep the script pretty when there are many options and/or arguments in a command, but it is not required. Essentially it has no difference at all to the version with everything in one line
+
+Here are some explanations to the parameters:
+* `--genomeDir genome/star-index`: specify the location of the indexed genome directory, i.e. the output of the previous step
+* `--runThreadN 10`: use 10 cores for the alignment
+* `--readFilesIn rawdata/SRR2815952.fastq.gz`: specify the input FASTQ file(s). If the data is PE with the two mates in data_1.fastq.gz and data_2.fastq.gz, put them both here separated by a space (`--readFilesIn data_1.fastq.gz data_2.fastq.gz`)
+* `--readFilesCommand zcat`: specify the command used to display content of the input file (the `--readFilesIn` option). `zcat` is the command to decompress a .gz file with `gzip` and then print to the screen (stdout). `zcat file.gz` is equivalent to `gzip -cd file.gz`. Since the input file is gzipped, `zcat` needs to be specified as the way to print it. Otherwise, the FASTQ file would need to be decompressed beforehand
+* `--outSAMtype BAM SortedByCoordinate`: specify the type of output file. The standard output is in SAM format, and BAM is the binary version of SAM format which greatly reduces the storage usage, while more time is needed for the format conversion. A BAM file can be unsorted (`Unsorted`), or sorted by coordinate (`SortedByCoordinate`).
+* `--outFileNamePrefix mapping/SRR2815952/`: specify how the output files are named. What is specified here is the prefix of the output file. For instance, the default BAM file name is `Aligned.sortedByCoord.out.bam`. In the example, the output BAM file will be called `mapping/SRR2815952/Aligned.sortedByCoord.out.bam`. Of course, in this case it becomes necessary that the directory "mapping" exists in the current folder, and there is also the directory "SRR2815952" in the "mapping" folder. This is why the two `mkdir` commands are used before the `STAR` command
+
+#### Quantification of gene expression
+For RNA-seq data, read mapping is not what we ultimately need. In most of the time, what we actually need is the assessment of expression levels of different genes, and mapping is just the intermediate step. So how shall we then convert the read mapping results to gene expression values?
+
+The most straightforward way, is to count the number of reads that are aligned to the exonic region of each gene. The more reads are aligned to the gene, the higher expression the gene has. Obviously, such raw read count values have a critical problem, that different RNA-seq data can have huge difference on sequencing depths. For instance, we have one sample with 100 reads aligned to a gene, while the same gene got 200 reads in another sample. Does it mean the gene has higher expression in the second sample? Not necessarily, as we might have 1 million reads in total for the first sample, while 10 million reads for the second sample. With 10-fold higher coverage for the second sample, we would also expect to see 10-fold as many reads mapped to a gene with the same expression level in the two samples; while in this case, the gene only has twice as many reads aligned to the gene. This suggests that this gene probably has much lower expression in the second sample instead.
+
+What just mentioned is one issue when comparing the same gene across different samples. There is also an issue when comparing different genes even in the same sample. The standard bulk RNA-seq experiments usually include a random fragmentation step so that different parts of one long transcript can all the sequenced. On the other hand, it means that longer transcripts are more likely to generate more fragments, and therefore more reads. Therefore, two genes with the same number of reads aligning to don't necessarily mean they have similar expression levels, if their transcript lengths vary a lot.
+
+To take into account those biases, people introduce different so-called normalization methods, to try to derive some metrics of expression levels which are more comparable among genes and samples. The simple but commonly used options include RPKM (Reads Per Kilobase Million reads) or FPKM (Fragments Per Kilobase Million reads) which are very similar with each other, and TPM (Transcript Per Million reads). The two methods, RPKM/FPKM and TPM are very similar, which is to calculate a scaling factor per sample per gene to correct the biases due to differences at sequencing coverage and gene lengths. The difference between them is the RPKM/FPKM considers the total number of reads in a sample as the proxy of sequencing coverage. Essentially it assumes different samples contain the same amount of nucleotides. On the other hand, TPM considers the total number of detected transcripts as the proxy of sequencing coverage, which means it assumes different samples share the same number of transcripts. Practically speaking, both methods firstly do a gene-length correction by dividing the read number at a gene by the gene length (or times a fixed scaling factor, e.g. $10^6$ afterwards). After that, RPKM/FPKM divides the resulted values by the total number of reads/fragments in the sample, while TPM divides the results by the sum of the scaled values across all genes.
+
+For both RPKM/FPKM and TPM, there is still one critical issue: the gene length.
 
 
 <style scoped> table { font-size: 0.8em; } </style>
