@@ -579,7 +579,7 @@ cutadapt -a=AGATCGGAAGAG -A=AGATCGGAAGAG --minimum-length=25 -o read_1_trimmed.f
 >* If the data is PE, make sure to provide both reads to trigger the PE trimming mode, so that the two paired reads are kept or removed together in a pair. This is important. For PE data the two reads are stored in two separated FASTQ files, but it is strictly required that reads in the two files have the same number of reads which are paired in the same order.
 
 As you can see above, the `cutadapt` command expects only one sample per time. When you have many samples, you need to either run it one-by-one manually, or you can rely on for-loop in the Bash scripting. For example, this is the script to apply the same trimming to all the fastq.gz files in the current folder, and store the trimmed FASTQ files in the new subdirectory called `trimmed`:
-```
+```console
 mkdir trimmed
 for file in *.fastq.gz; do
   cutadapt --adapter=AGATCGGAAGAG --minimum-length=25 -o trimmed/$file $file
@@ -607,11 +607,64 @@ Once the quality of the data is confirmed, we need to convert those millions of 
 There are different tools, or aligners, that have been developed for this purpose. The most famous examples include [Tophat/Tophat2](https://ccb.jhu.edu/software/tophat/index.shtml)/[HISAT2](https://daehwankimlab.github.io/hisat2/) and [STAR](https://github.com/alexdobin/STAR). As the commonly used modern aligners, HISAT2 and STAR shares quite some features, such as their high-efficiency, and their support of soft-trimming for low-quality bases at the ends of reads. They also have their own adventage and disadventage. HISAT2 uses fewer computational resource than STAR (particularly memory) and has better support for SNPs (single-nucleotide polymorphism) that in the same locus on the genome different individuals can have different nucleotides. On the other hand, STAR is suggested to provide more accurate alignment results. It also supports varied ways for the next step to quantify transcript abundance. In this tutorial, we will use STAR to map the FASTQ files we retreived from SRA to the human genome.
 
 #### Brief introduction to the STAR aligner
+Before STAR was developed and got widely acknowledged, there had been other aligners being developed, with the most commonly used example being Tophat by Cole Trapnell when he was in his PhD in University of Maryland (he is now an Associate Professor in University of Washington). Those tools were great and used by many studies using RNA-seq whichhad shown its great potential but was not yet fully mature as it is today. The main problem of those tools before STAR was their speed. They might be good enough when there were several or dozens of samples to process, but not for the research project with huge consotia effort such as ENCODE (Encyclopedia of DNA Elements), which generated RNA-seq data for hundreds or even thousands of samples.
 
-#### Create genome index
+To solve the speed issue was one of the major motivations that STAR (Spliced Transcripts Alignment to Reference) was developed in 2009 by Alexander Dobin in Cold Spring Harbor Laboratory (he is now an Assistant Professor in CSHL). The [STAR paper](https://academic.oup.com/bioinformatics/article/29/1/15/272537) was published in 2013 in Bioinformatics. Until now, the tool is still under active improvement and maintenance.
+
+In brief, STAR uses a two-step procedure to achieve the high-speed alignment. The first step is seed search. For each read, STAR firstly searches for its longest sub-sequence that perfectly matches at least one locus on the reference genome. This fragment is called maximal mappable prefixes (MMP). After getting the MMP for the read, STAR searches MMP again but only for the unmapped portion (i.e. the parts outside of the MMP) of the read. These two MMPs obtained by the sequential search are also altogether called *seeds*, and that's why this step is named "seed search". This sequential search not only make it straightforward to deal with splice junctions where a read contains sequences from two separated exons in the genome, but also greatly speed up the alignment as searching for the entire read sequence is no longer needed.
+
+<p align="center">
+<img src="img/star_seed_search.jpeg" /><br/>
+<sub><i>Figure 1 in the STAR paper</i></sub>
+</p>
+
+To further deal with the possible mismatches (due to sequencing errors on reads, SNPs, point mutations, errors in the reference genome, etc.), when the MMP search doesn't reach the end of the read, the MMPs will serve as anchors in the genome that can be extended to allow for alignments with mismatches. If the extension procedure does not yield a good genomic alignment (due to poor quality at the ends of reads, poly-A tails, adapter sequence ligation, etc.), a soft trimming is applied (the remaining read sequence is ignored although not physically cut off).
+
+After the seed search is done, STAR applies the second step, which is clustering, stitching and scoring. Seeds are firstly clustered based on proximity to a set of ‘anchor’ seeds. Then, seeds that map close enough around the anchors (so that it can be still considered to be an intron) are stitched together. In this way, different seeds of a read which are from different exons can be stitched. The stitching is guided by a local alignment scoring scheme to penaltze mismatches, insertions, deletions and splice junction gaps. The stitched combination with the highest score is chosen as the best alignment of a read.
+
+More details information are available in the STAR paper (technical details in its Supplementary Materials).
+
+#### Download genome sequences and create genome index for STAR
+The seed search in STAR is implemented through uncompressed suffix arrays (SAs). We won't go into the details how SAs works, but STAR needs the reference genome to be represented in the form of SAs so that it can apply its seed search for the reads. Therefore, the first step of using STAR is actually to have your reference genome ready, and then use the "genomeGenerate" function in STAR to prepare SAs for it.
+
+So we need to firstly retrieve the reference genome. Specifically for the example data set, we need a human reference genome.
+
+There are different places where we can obtain the genome sequences of human and other species. The [UCSC Genome Browser](https://genome.ucsc.edu/) provides probably the most and up-to-date resources of genome sequences with selected gene annotations, which can be both browsed via the online browser and downloaded. It of course includes the human genome, which can be downloaded via "Downloads" -> "Genome Data" at the header menu bar.
+
+<p><img src="img/ucsc_genome_browser.png" /></p>
+
+In the download page, data are grouped by species in mostly alphabetical order, except human as the first one. The most popular species also have links at the very top so that one doesn't always need to scroll down that much. At the [human section](https://hgdownload.soe.ucsc.edu/downloads.html#human), you can see the links of different human genome data, which are further grouped by different human reference genome versions. Here we want to the newest human reference genome (GRCh38/hg38), and from that section we can choose "Genome sequence files and select annotations" and then "Standard genome sequence files and select annotations". That leads to a page with introduction and file description on top and links to different files for download if you scroll down to the bottom. Among all the provided files, what we need right now is [hg38.fa.gz](https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz), which is the gzip-compressed FASTA file containing sequences of all the human chromosomes (as well as the scaffolds and contigs that haven't yet been integrated into the chromosomes).
+
+So now you can choose to download the file directly to your computer, and then transfer it to the server using the methods mentioned above (`scp` or SFTP), or directly download the data to the server. For the latter, you can use the `wget` command:
+```console
+cd [student folder]
+wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
+```
+
+STAR expects decompressed FASTA file(s) for the reference genome, so you shall decompress it before moving on:
+```console
+gzip -d hg38.fa.gz
+```
+
+Now we can build the genome index of the human reference genome for STAR
+```console
+mkdir star-index
+STAR --runThreadN 10 --runMode genomeGenerate --genomeDir star-index --genomeFastaFiles hg38.fa
+```
+
+This command tells STAR to use 10 cores in the server to build the genome index for the genome in the FASTA file hg38.fa, and then store the resulted indexed genome in the newly created star-index directory. With this setting, it takes about one hour for the human genome to finish the indexing, with about 30GB RAM needed.
+```
+$ STAR --runThreadN 10 --runMode genomeGenerate --genomeDir star-index --genomeFastaFiles hg38.fa
+        STAR --runThreadN 10 --runMode genomeGenerate --genomeDir star-index --genomeFastaFiles hg38.fa
+        STAR version: 2.7.10a   compiled: 2022-01-14T18:50:00-05:00 :/home/dobin/data/STAR/STARcode/STAR.master/source
+Sep 01 12:16:25 ..... started STAR run
+Sep 01 12:16:25 ... starting to generate Genome files
+Sep 01 12:17:25 ... starting to sort Suffix Array. This may take a long time...
+Sep 01 12:17:41 ... sorting Suffix Array chunks and saving them to disk...
+```
 
 #### Mapping with STAR
-
+Once the genome indexing is done, you are ready to map the reads to the reference genome.
 
 
 <style scoped> table { font-size: 0.8em; } </style>
