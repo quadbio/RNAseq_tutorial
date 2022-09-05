@@ -301,9 +301,15 @@ wget https://repo.anaconda.com/miniconda/Miniconda3-py37_4.12.0-Linux-x86_64.sh
 bash Miniconda3-py37_4.12.0-Linux-x86_64.sh
 ```
 
-And then simply follow the prompts on the screen. Most of the settings you can simply leave it default without any change. However, if you are using the bs-studentsvr04 for the Systems Genomics course, you should change the default installation location (your home folder) to your scratch folder. This also applies to many other computing servers, where limitations are set to how much data and/or file numbers you can store in the home folder.
+And then simply follow the prompts on the screen. 
+
+>**TIPS**
+>* During the installation of miniconda, you will be asked to read through the "End User License Agreement" and confirm. Obviously that's not a short document that you can see in one screen. You can type Enter to every time go one line forward and carefully read it through, or press F to do page-down scrolling to reach the end quickly. Be aware that the default answer is "no" for disagreeing with the document and then the installation will be quit, so do answer "yes" when you are asked.
+>* By default the miniconda program will be installed to your home folder (usually `/home/[your username]/miniconda3`). However, if you are using the bs-studentsvr04 for the Systems Genomics course, you should change it to your scratch folder (`/local0/students/[your username]`). Make sure that folder is created already. If not, create it with the `mkdir` command (`mkdir /local0/students/[your username]`). The similar priciple usually applies to many other computing servers as well, where limitations are set to how much data and/or file numbers you can store in the home folder.
+>* The last step of the installation asks you whether to run `conda init` right after. The default is "no" but here I would recommend to answer "yes". Otherwise, you shall run `conda init` by yourself after the installation is done.
 
 Once the installation is done, you shall quit the login session to the server, and then log in it again. Afterwards, you can check whether the conda is successfully installed and set up by simply checking where your Python interpreter is.
+
 
 ```console
 which python
@@ -652,6 +658,15 @@ cd genome
 wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
 ```
 
+>**NOTE**
+>The UCSC Genome Browser is not the only place to download genomes. There are other databases:
+>* [Ensembl genome browser](https://www.ensembl.org/index.html), which also provide genomic data (genome sequences, annotation, comparative biology, etc) of many different animal species, mostly vertebrate but also the most commonly used invertebrate model species: *Caenorhabditis elegans* (roundworm), *Drosophila melanogaster* (common fruit fly), and *Saccharomyces cerevisiae* (Brewer's Yeast)
+>* [GENCODE](https://www.gencodegenes.org/) for human and mouse, which curates the most comprehensive gene annotation for the two species, and also provide the corresponding genome sequence it uses for download.
+>* [FlyBase](https://flybase.org/) for fruit flies (*Drosophilia*), which provides both genome sequences and gene annotation of different *Drosophilia* species
+>* [WormBase](https://wormbase.org/), which provides genome sequences, gene annotations, and other information concerning the genetics, genomics and biology of *C. elegans* and related nematodes.
+
+
+
 STAR expects decompressed FASTA file(s) for the reference genome, so you shall decompress it before moving on:
 ```console
 gzip -d hg38.fa.gz
@@ -778,7 +793,7 @@ The CIGAR string is used to represent how the read is aligned to the reference s
 
 When representing an alignment of a RNA-seq read, the commonly seen operations are M, I, D, N and S. Now if we look at the CIGAR `1S99M`, it means the first base of the read is soft clipped (discarded), while the remaining 99 bases are one-to-one matched to the reference sequence (with the same or different nucleotides). As a more complicated example, `33M1685N66M1S` means the first 33 bases of the read one-to-one aligned to the reference, and then on the reference there is a 1685-base-long gap, and then next 66 bases of the read is then aligned one-to-one to the reference after that gap, and the last base of the read is soft clipped.
 
-#### Quantification of gene expression
+#### Quantification of gene expression per sample
 For RNA-seq data, read mapping is not what we ultimately need. In most of the time, what we actually need is the assessment of expression levels of different genes, and mapping is just the intermediate step. So how shall we then convert the read mapping results to gene expression values?
 
 The most straightforward way, is to count the number of reads that are aligned to the exonic region of each gene. The more reads are aligned to the gene, the higher expression the gene has. Obviously, such raw read count values have a critical problem, that different RNA-seq data can have huge difference on sequencing depths. For instance, we have one sample with 100 reads aligned to a gene, while the same gene got 200 reads in another sample. Does it mean the gene has higher expression in the second sample? Not necessarily, as we might have 1 million reads in total for the first sample, while 10 million reads for the second sample. With 10-fold higher coverage for the second sample, we would also expect to see 10-fold as many reads mapped to a gene with the same expression level in the two samples; while in this case, the gene only has twice as many reads aligned to the gene. This suggests that this gene probably has much lower expression in the second sample instead.
@@ -789,9 +804,107 @@ To take into account those biases, people introduce different so-called normaliz
 
 Nowadays TPM is generally preferred in relative to RPKM/FPKM. However, in most of the time, using RPKM/FPKM or TPM doesn't change the results of the following analysis too much. There are also other normalization methods which tries to estimate the scaling factor in a different ways (e.g. CPM (Counts Per Million), [DESeq2's median of ratios](http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#sample-gene-dependent-normalization-factors) and [edgeR's TMM](https://genomebiology.biomedcentral.com/articles/10.1186/gb-2010-11-3-r25)).
 
-No matter which normalization method to use, the raw count values are always the thing to start with. Given the read mapping results stored in the SAM/BAM format, plus the gene annotation which provides the information of gene structures (GTF/GFF are the preferred file format).
+No matter which normalization method to use, the raw count values are always the thing to start with. Given the read mapping results stored in the SAM/BAM format, plus the gene annotation which provides the information of gene structures (GTF/GFF are the preferred file format). Here you don't need to do any programming to get the counting done, although you also can as it doesn't need any complicated principle. There are tools to do the counting for you. For example, the [`htseq-count`](https://htseq.readthedocs.io/en/master/htseqcount.html) command in the [HTSeq](https://htseq.readthedocs.io/en/master/index.html) package. Indeed, STAR supports to do the read counting directly via involving `htseq-count` as one step of its pipeline. One just needs to specify the option `--sjdbGTFfile [annotation.gtf]` for the annotation file in GTF format, and `--quantMode GeneCounts`.
 
-Meanwhile, no matter which method it is, if it ever wants to make comparison between genes in a sample possible, there is one critical issue that has to be solved: the <u>gene length</u>, or more precisely, the total exonic length of a gene. It may sound trivial, but it's actually not. Most genes in eukaryotes can be transcribed into different types of transcripts (called isoforms) by alternative splicing, and/or using different transcription start and/or termination sites. It is easy to imagine that those different isoforms have different lengths, and they can all appear in the sample with completely different abundances. In such a scenario, how should we define the length of a gene? The sum of all its possible exon regions? The length of its longest isoform? The average length of the isoforms? Some of them might be better than the others but none seems to be the optimal solution.
+In general, you can get the gene annotation file from the same database where you download the genome sequence (including all the mentioned ones: [UCSC Genome Browser](https://genome.ucsc.edu/), [Ensembl genome browser](https://www.ensembl.org/), [GENCODE](https://www.gencodegenes.org/), [FlyBase](https://flybase.org/), [WormBase](https://wormbase.org/)). For example, in UCSC Genome Browser, among the files listed for download, you shall be able to see a folder called "genes" (e.g. for human hg38 genome in this [link](https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/genes/)). It contains several GTF files (gzipped). They represent different annotation models: ncbiRefSeq for the complete (curated+predicted) RefSeq database of NCBI, refGene for only the curated subset of RefSeq, ensGene for the Ensembl database, knownGene for the UCSC curated models or adapted from GENCODE database. Using any one here should be fine. For human and mouse, you can also download the gene annotations in GTF format, which is fully compatible with the genome sequences at the UCSC Genome Browser. The Ensembl genome brwoser is another commonly used database to get gene annotation for many vertebrate species including human and mouse, which is usually more comprehensive than the annotation that's downloadable at UCSC Genome Browser; however, do pay attention that the genome versions. The genome sequences that the Ensembl gene annotation is based on may not be the newest genome version you have downloaded from UCSC Genome Browser; and even if they are equivalent (e.g. the human genome GRCh38 by Ensembl and hg38 in UCSC/GENCODE are the same), the chromosome names may follow different styles. For example, chromosome names in the human genome hg38 are in the UCSC style which are always called "chr\*" (e.g. chr1, chrX, chrM); while chromosomes in GRCh38, although with exactly the same sequences, are named in the Ensembl style instead where there is no "chr" (e.g. 1, X, MT). Unfortunately, the counting programs would not automatically recognize this difference and do the conversion, but would just output the error that no matching chromosomes is found between the read mapping results and the gene annotation. Therefore, it is always the safest if the genome sequences and gene annotations are downloaded from the same database, unless you are confident that they are compatible.
+
+So here, we can download the human gene annotation in GTF format from the newest GENCODE, and then rewrite the STAR command to let it do the counting as well:
+```console
+cd [student folder]
+wget -O genome/gencode.v41.annotation.gtf.gz https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/gencode.v41.annotation.gtf.gz
+gzip -d genome/gencode.v41.annotation.gtf.gz
+mkdir mapping_count
+mkdir mapping_count/SRR2815952
+STAR --genomeDir genome/star-index \
+     --runThreadN 10 \
+     --readFilesIn rawdata/SRR2815952.fastq.gz \
+     --readFilesCommand zcat \
+     --sjdbGTFfile genome/gencode.v41.annotation.gtf\
+     --quantMode GeneCounts \
+     --outSAMtype BAM SortedByCoordinate \
+     --outFileNamePrefix mapping_count/SRR2815952/
+```
+
+In this case, what you will see in the output folder are very similar to the previous run, but this file in addition: `ReadsPerGene.out.tab`. It outputs the read counting result of genes in the given gene annotation.
+```
+$ head mapping_count/SRR2815952/ReadsPerGene.out.tab
+N_unmapped      10535   10535   10535
+N_multimapping  171145  171145  171145
+N_noFeature     36166   755589  752599
+N_ambiguous     144048  38322   36041
+ENSG00000223972.5       0       0       0
+ENSG00000227232.5       0       0       0
+ENSG00000278267.1       0       0       0
+ENSG00000243485.5       0       0       0
+ENSG00000284332.1       0       0       0
+ENSG00000237613.2       0       0       0
+```
+
+In the table, the first column is the gene ID (except for the first four rows for reads being skipped for varied reasons). The next three columns are the counts for unstranded RNA-seq (no strand information is preserved in the data), 1st read strand aligned with RNA (stranded RNA-seq data where the read, or 1st read in PE data, mapped to the same strand as the gene), 2nd read strand aligned with RNA (stranded RNA-seq data where the read, or 1st read in PE data, mapped to the reverse strand as the gene). In this example, the data is unstranded so the second column is the numbers we need.
+
+Now in principle we can apply the pipeline to all the samples, summarize them into a table, and then start the analysi.
+
+**BUT...**
+
+Let me remind you there is one more issue you may want to think about. All the mentioned normalization methods above, if ever want to make comparison between genes in a sample possible, need to get one critical information: the <u>gene length</u>, or more precisely, the total exonic length of a gene. It may sound trivial, but it's actually not. Most genes in eukaryotes can be transcribed into different types of transcripts (called isoforms) by alternative splicing, and/or using different transcription start and/or termination sites. It is easy to imagine that those different isoforms have different lengths, and they can all appear in the sample with completely different abundances. In such a scenario, how should we define the length of a gene? The sum of all its possible exon regions? The length of its longest isoform? The average length of the isoforms? Some of them might be better than the others but none seems to be the optimal solution.
+
+And the tool [RSEM](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-12-323) provides a pretty good solution here. It uses the Expectation-Maximization (EM) algorithm to estimate the proportion of different isoforms of a gene that contributes the reads that are mapped to that gene. It can therefore estimate the TPM of each transcript isoform, and then the TPM of the gene as the sum of all the isoforms. At the same time it also estimates the effective gene length which can be seen as the weighted average of all its isoforms, by the contribution of them. The complete RSEM pipeline includes the mapping to the **transcriptome** (using Bowtie by default), but it supports a SAM/BAM file of alignment to transcriptome as the input as well. For STAR which we use to do the mapping, although the alignment is done to the genome, by providing the gene annotation, there is also the option to generate a SAM/BAM file of mapping to the transcriptome: `--quantMode TranscriptomeSAM`.
+
+Now let's further modify our script to run STAR:
+```console
+cd [student folder]
+mkdir mapping_transcriptome
+mkdir mapping_transcriptome/SRR2815952
+STAR --genomeDir genome/star-index \
+     --runThreadN 10 \
+     --readFilesIn rawdata/SRR2815952.fastq.gz \
+     --readFilesCommand zcat \
+     --sjdbGTFfile genome/gencode.v41.annotation.gtf\
+     --quantMode TranscriptomeSAM \
+     --outSAMtype BAM SortedByCoordinate \
+     --outFileNamePrefix mapping_transcriptome/SRR2815952/
+```
+
+Now we can run RSEM given the transcriptome aligned BAM by STAR, though we need to make an RSEM index for the genome plus annotation first
+```console
+cd [student folder]
+mkdir genome/rsem_hg38_gencode41
+rsem-prepare-reference --gtf genome/gencode.v41.annotation.gtf \
+    genome/hg38.fa \
+    genome/rsem_hg38_gencode41/rsem_hg38_gencode41
+```
+
+Finally we can get it done.
+```console
+cd [student folder]
+mkdir rsem
+mkdir rsem/SRR2815952
+rsem-calculate-expression --alignments \
+                          -p 10 \
+                          mapping_transcriptome/SRR2815952/Aligned.toTranscriptome.out.bam \
+                          genome/rsem_hg38_gencode41/rsem_hg38_gencode41 \
+                          rsem/SRR2815952/SRR2815952
+```
+
+>**NOTE**
+> * The `-p 10` option specifies 10 threads to use for the estimation
+> * You may be annoyed by the huge amount of verbose message output to your screen. In that case you can do a quiet run by adding the `-q` option before giving the BAM file path
+> * If the data is PE, there should be an option `--paired-end` added before the path to the BAM file
+
+We can now check the RSEM estimates on the gene level:
+```console
+$ head -5 rsem/SRR2815952/SRR2815952.genes.results 
+gene_id transcript_id(s)        length  effective_length        expected_count  TPM     FPKM
+ENSG00000000003.15      ENST00000373020.9,ENST00000494424.1,ENST00000496771.5,ENST00000612152.4,ENST00000614008.4    1803.81  1704.81 10.00   5.50    3.79
+ENSG00000000005.6       ENST00000373031.5,ENST00000485971.1     873.50  774.50  0.00    0.00    0.00
+ENSG00000000419.14      ENST00000371582.8,ENST00000371584.9,ENST00000371588.10,ENST00000413082.1,ENST00000466152.5,ENST00000494752.1,ENST00000681979.1,ENST00000682366.1,ENST00000682713.1,ENST00000682754.1,ENST00000683010.1,ENST00000683048.1,ENST00000683466.1,ENST00000684193.1,ENST00000684628.1,ENST00000684708.1    1056.68 957.68  26.00   25.46   17.53
+ENSG00000000457.14      ENST00000367770.5,ENST00000367771.11,ENST00000367772.8,ENST00000423670.1,ENST00000470238.1   2916.00  2817.00 8.00    2.66    1.83
+```
+
+The first column is the gene ID, and the second column shows all the isoforms that the gene can generate according to the gene annotation. The third column shows the effective gene length. The fourth column shows the sum of the expected counts to different isoforms. Finally, the last two columns show the estimated TPM and FPKM of the gene as the sum of TPM and FPKM of the isoforms. Note that on the isoform level, it is TPM being estimated first, and then converted to FPKM.
+
+#### Applying the whole STAR procedure to all samples
+All the above are for the mapping and RSEM gene expression quantification of one sample. We can now wrap everything up into one Bash script to apply the procedure to all samples one-by-one.
 
 
 <style scoped> table { font-size: 0.8em; } </style>
