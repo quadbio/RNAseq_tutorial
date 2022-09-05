@@ -721,7 +721,7 @@ In the SAM/BAM alignment section, each line shows one alignment record (one read
 |3|RNAME|String|Reference sequence NAME|
 |4|POS|Int|1-based leftmost mapping POSition|
 |5|MAPQ|Int|MAPping Quality|
-|6|CIGAR|String|CIGAR string|
+|6|CIGAR|String|CIGAR (Concise Idiosyncratic Gapped Alignment Report) string|
 |7|RNEXT|String|Reference name of the mate/next read|
 |8|PNEXT|Int|Position of the mate/next read|
 |9|TLEN|Int|observed Template LENgth|
@@ -730,7 +730,7 @@ In the SAM/BAM alignment section, each line shows one alignment record (one read
 
 This is some example records of STAR output
 ```
-$ samtools view mapping/SRR2815952/Aligned.sortedByCoord.out.bam | head -5
+ samtools view mapping/SRR2815952/Aligned.sortedByCoord.out.bam | head -5
 SRR2815952.157604       256     chr1    13174   0       100M    *       0       0       TGGGGAGGCAGCTGTAACTCAAAGCCTTAGCCTCTGTTCCCACGAAGGCAGGGCCATCAGGCACCAAAGGGATTCTGCCAGCATAGTGCTCCTGGACCAG    @@@BDDFFHHGHHGHHFHJIGJIH@HGEGGHIFHIIEGGJIIIIIFGIJJIGICEHEEEEF>BFDCDDDC@B?CC>ACDDC@CCDCDD=ACC>CD??CBB    NH:i:6  HI:i:3  AS:i:98 nM:i:0
 SRR2815952.1546698      16      chr1    13333   0       100M    *       0       0       GGTCAAAGCCACATTTGGTTCTGCCATTGCTGCTGTGTGGAAGTTCACTCCTGCCTTTTCCTTTCCCTAGAGCCTCCACCACCCCGAGATCACATTTCTC    DDDDDDDDC@4+(DDDDDDDDDDDDDDDDDDDDDDEEEEEFFFFFECHHHIIIIIJJJJJIJJJJJJIJIIJJIEIGDHHFJJJJJIHHFHFFFFFFC@B    NH:i:7  HI:i:1  AS:i:96 nM:i:1
 SRR2815952.1726304      0       chr1    14480   0       100M    *       0       0       TGGAGCCGTCCCCCCATGGAGCACAGGCAGACAGAAGTCCCCGCCCCAGCTGTGTGGCCTCAAGCCAGCCTTCCGCTCCTTGAAGCTGGTCTCCACACAG    CCCFFFFFHHHHHJJJJJIIJJJJJJJJIJJJJIIJEFHIJJIIHHFFDEEECDCDDDDDDDDCDDDDDDDDDDDBDDDDDDDDDDCDDCDDDDCDDD@D    NH:i:7  HI:i:1  AS:i:98 nM:i:0
@@ -741,9 +741,42 @@ SRR2815952.1546699      0       chr1    14581   1       100M    *       0       
 >**NOTE**
 >As text files, SAM files are readable with any text file viewer (e.g. the `less` command). In principle, it is also editable with text file editor directly. However, this is highly unrecommended as it may easily break the requirements of any field and make fatal mistakes. On the other hand, a BAM file is not readable as binary compiled file. One needs the toolkit `samtools` to view, sort, subset, or apply any other manipulation to the BAM file, and it is highly recommended to do the same for SAM files as well.
 
-The first 11 fields remain the same as the description (`RNEXT` is `*` meaning unavailable, and therefore `PNEXT` is 0 also for unavailability). In addition, there are extra fields representing different information. For instance, the 12th field (`NH`) shows the number of loci the read is mapped to, and the 15th field (nM) shows the number of mismatches between the read and the sequence it aligns to.
+The first 11 fields remain the same as the description (`RNEXT` is `*` meaning unavailable, and therefore `PNEXT` is 0 also for unavailability). In addition, there are extra fields representing different information. For instance, the 12th field (`NH`) shows the number of loci the read is mapped to, the 14th field (`AS`) shows the alignment score, and the 15th field (nM) shows the number of mismatches between the read and the sequence it aligns to.
 
 There are two fields that would probably need some more detailed explanations so that one can understand what it means exactly: one is the second field `FLAG`, and the other one is the sixth field `CIGAR`.
+
+The `FLAG` field is an integer encoded for quite some TRUE/FALSE information related to the read. It firstly represent the multiple attributes of a read alignment as the sum of bitwise flags (e.g. `000100010000`), and then a binary to decimal conversion is applied to obtain the integer FLAG (with the given example, 272). Each bit of the binary number represents one defined property of the alignment:
+
+|Integer|Binary|Description (Paired Read Interpretation)|
+|-------|------|----------------------------------------|
+|1|000000000001|template having multiple templates in sequencing (read is paired)|
+|2|000000000010|each segment properly aligned according to the aligner (read mapped in proper pair)|
+|4|000000000100|segment unmapped (read1 unmapped)|
+|8|000000001000|next segment in the template unmapped (read2 unmapped)|
+|16|000000010000|SEQ being reverse complemented (read1 reverse complemented)|
+|32|000000100000|SEQ of the next segment in the template being reverse complemented (read2 reverse complemented)|
+|64|000001000000|the first segment in the template (is read1)|
+|128|000010000000|the last segment in the template (is read2)|
+|256|000100000000|not primary alignment|
+|512|001000000000|alignment fails quality checks|
+|1024|010000000000|PCR or optical duplicate|
+|2048|100000000000|supplementary alignment (e.g. aligner specific, could be a portion of a split read or a tied region)|
+
+The CIGAR string is used to represent how the read is aligned to the reference sequences. It is always made of `<integer><operation>` pairs (e.g. `1S99M`). One operation is a type of alignment, and the integer specifies the number of consecutive operations. Those operations include:
+
+|Operation|Description|Consumes query|Consumes reference|
+|--|-----------|--------------|------------------|
+|M|alignment match (can be a sequence match or mismatch)|yes|yes|
+|I|insertion to the reference|yes|no|
+|D|deletion from the reference|no|yes|
+|N|skipped region from the reference|no|yes|
+|S|soft clipping (clipped sequences present in SEQ)|yes|no|
+|H|hard clipping (clipped sequences NOT present in SEQ)|no|no|
+|P|padding (silent deletion from padded reference)|no|no|
+|=|sequence match|yes|yes|
+|X|sequence mismatch|yes|yes|
+
+When representing an alignment of a RNA-seq read, the commonly seen operations are M, I, D, N and S. Now if we look at the CIGAR `1S99M`, it means the first base of the read is soft clipped (discarded), while the remaining 99 bases are one-to-one matched to the reference sequence (with the same or different nucleotides). As a more complicated example, `33M1685N66M1S` means the first 33 bases of the read one-to-one aligned to the reference, and then on the reference there is a 1685-base-long gap, and then next 66 bases of the read is then aligned one-to-one to the reference after that gap, and the last base of the read is soft clipped.
 
 #### Quantification of gene expression
 For RNA-seq data, read mapping is not what we ultimately need. In most of the time, what we actually need is the assessment of expression levels of different genes, and mapping is just the intermediate step. So how shall we then convert the read mapping results to gene expression values?
