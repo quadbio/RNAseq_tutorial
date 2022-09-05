@@ -905,6 +905,54 @@ The first column is the gene ID, and the second column shows all the isoforms th
 
 #### Applying the whole STAR procedure to all samples
 All the above are for the mapping and RSEM gene expression quantification of one sample. We can now wrap everything up into one Bash script to apply the procedure to all samples one-by-one.
+```console
+cd [student folder]
+
+if [ ! -e mapping_transcriptome ]; then
+  mkdir mapping_transcriptome
+fi
+if [ ! -e rsem ]; then
+  mkdir rsem
+fi
+
+for id in `cat SRR_Acc_List.txt`; do
+  echo "start to process sample $id"
+  if [ ! -e mapping_transcriptome/$id ]; then
+    echo "  mapping started"
+    mkdir mapping_transcriptome/$id
+    STAR --genomeDir genome/star-index \
+         --runThreadN 10 \
+         --readFilesIn rawdata/${id}*.fastq.gz \
+         --readFilesCommand zcat \
+         --sjdbGTFfile genome/gencode.v41.annotation.gtf \
+         --quantMode TranscriptomeSAM \
+         --outSAMtype BAM SortedByCoordinate \
+         --outFileNamePrefix mapping_transcriptome/$id/
+    echo "  mapping done"
+  fi
+  
+  if [ ! -e rsem/$id ]; then
+    echo "rsem started"
+    num_fa=`ls -1 rawdata/${id}*.fastq.gz | wc -l`
+    if [ $num_fa -eq 1 ]; then
+      rsem-calculate-expression --alignments \
+                                -p 10 \
+                                mapping_transcriptome/$id/Aligned.toTranscriptome.out.bam \
+                                genome/rsem_hg38_gencode41/rsem_hg38_gencode41 \
+                                rsem/$id/$id
+    else
+      rsem-calculate-expression --alignments \
+                                --paired-end \
+                                -p 10 \
+                                -q \
+                                mapping_transcriptome/$id/Aligned.toTranscriptome.out.bam \
+                                genome/rsem_hg38_gencode41/rsem_hg38_gencode41 \
+                                rsem/$id/$id
+    fi
+    echo "  rsem done"
+  fi
+done
+```
 
 
 <style scoped> table { font-size: 0.8em; } </style>
