@@ -986,6 +986,58 @@ mkdir kallisto_index
 kallisto index -i kallisto_index/hg38_gencode41 gencode.v41.transcripts.fa.gz
 ```
 
+Once the transcriptome index is done, we can start the pseudoalignment using kallisto to the transcriptome.
+```console
+cd [student folder]
+mkdir kallisto
+mkdir kallisto/SRR2815952
+kallisto quant -i transcriptome/kallisto_index/hg38_gencode41 \
+               -o kallisto/SRR2815952 \
+               --single \
+               -l 400 \
+               -s 40 \
+               --threads=10 \
+               rawdata/SRR2815952.fastq.gz
+```
+
+In the command, we specified the data type as SE by providing the `--single` option (otherwise PE data is expected). When the data is PE, kallisto estimates the average fragmentation size and its standard deviation by looking at the two mates. However, for SE data, it becomes required to provide the two parameters with the `-l` and `-s` options. Unfortunately, for most of the public data, this information is rarely provided. On the other hand, it is reported that using `-l 200` and `-s 20` works well for most of the data. So if you don't know the information, you can consider to use them.
+
+>**NOTE**
+>Here, according to the data description of the example data set, "sequencing libraries were prepared using the Truseq RNA-Seq Sample Prep Kit (Illumina)". One can then find the information online that "the TruSeq DNA Sample Preparation Kits are used to prepare DNA libraries with insert sizes from 300–500 bp for single, paired-end, and multiplexed sequencing". Therefore, we put `-l 400` and then double the default `-s` parameter as the `-l` parameter is doubled.
+
+In the kallisto output folder, we can see the output files. The file `abundance.tsv` is the table as a TAB-delimited text file which contains the estimated TPM of each transcript. Note that each transcript ID consists of the different transcript IDs / symbols, as well as the corresponding gene IDs / symbols, each being separated by "|". One can then based on this information to sum up the estimated TPMs of the isoforms belonging to the same gene. Unfortunately, there is no quantification directly on the gene-level provided.
+
+Now, similar to what we did for the STAR mapping plus RSEM estimation of TPM, we can write a Bash script to run kallisto to each sample one-by-one:
+```console
+cd [student folder]
+
+if [ ! -e kallisto ]; then
+  mkdir kallisto
+fi
+
+for id in `cat SRR_Acc_List.txt`; do
+  echo "start to process sample $id"
+  if [ ! -e kallisto/$id ]; then
+    mkdir kallisto/$id
+    
+    num_fa=`ls -1 rawdata/${id}*.fastq.gz | wc -l`
+    if [ $num_fa -eq 1 ]; then
+      kallisto quant -i transcriptome/kallisto_index/hg38_gencode41 \
+                     -o kallisto/$id \
+                     --single \
+                     -l 400 \
+                     -s 40 \
+                     --threads=10 \
+                     rawdata/$id.fastq.gz
+    else
+      kallisto quant -i transcriptome/kallisto_index/hg38_gencode41 \
+                     -o kallisto/$id \
+                     --threads=10 \
+                     rawdata/$id*.fastq.gz
+    fi
+  fi
+done
+```
 
 
 <style scoped> table { font-size: 0.8em; } </style>
