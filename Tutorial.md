@@ -1,6 +1,6 @@
 # Tutorial for bulk RNA-seq data preprocessing and analysis
 #### Compiled by Zhisong He
-#### Updated on 29 Aug 2022
+#### Updated on 07 Sept 2022
 ### Table of Content
   * [Introduction](#introduction)
   * [Preparation](#preparation)
@@ -11,7 +11,8 @@
   * [Preprocessing of RNA-seq data](#preprocessing-of-rna-seq-data)
     * [2-1 Quality control of RNA-seq data](#2-1-quality-control-of-rna-seq-data)
     * [2-2 Read mapping/pseudomapping and quantification](#2-2-read-mappingpseudomapping-and-quantification)
-      * [2-2-1 Read mapping via STAR and data quantification](#2-2-1-read-mapping-via-star-and-data-quantification)
+      * [2-2-1 Read mapping with STAR and data quantification](#2-2-1-read-mapping-with-star-and-data-quantification)
+	  * [2-2-2 Read pseudomapping with kallisto and data quantification](#2-2-2-read-pseudomapping-with-kallisto-and-data-quantification)
   * Analyze and compare RNA-seq data
 
 ## Introduction
@@ -616,7 +617,7 @@ done
 Also to keep in mind that fastp is able to do more complicated manipulations and examples are shown in its [github page](https://github.com/OpenGene/fastp). It also provides a QC summary, not as comprehensive as FastQC does but still reasonable. However, we won't go into those details in this tutorial.
 
 ## 2-2 Read mapping/pseudomapping and quantification
-### 2-2-1 Read mapping via STAR and data quantification
+### 2-2-1 Read mapping with STAR and data quantification
 Once the quality of the data is confirmed, we need to convert those millions of reads per sample into the gene- or transcript-level quantification. This would need the assignment of reads to genes or transcripts. To do this, the mostly common first step is for each read, to look for the genomic region that match with the read, given the complete genomic sequences. The identified region is then most likely the region being transcribed and generate the sequenced read in the end. This step of looking for the matched genomic regions for reads is called read genome mapping or alignment.
 
 There are different tools, or aligners, that have been developed for this purpose. The most famous examples include [Tophat/Tophat2](https://ccb.jhu.edu/software/tophat/index.shtml)/[HISAT2](https://daehwankimlab.github.io/hisat2/) and [STAR](https://github.com/alexdobin/STAR). As the commonly used modern aligners, HISAT2 and STAR shares quite some features, such as their high-efficiency, and their support of soft-trimming for low-quality bases at the ends of reads. They also have their own adventage and disadventage. HISAT2 uses fewer computational resource than STAR (particularly memory) and has better support for SNPs (single-nucleotide polymorphism) that in the same locus on the genome different individuals can have different nucleotides. On the other hand, STAR is suggested to provide more accurate alignment results. It also supports varied ways for the next step to quantify transcript abundance. In this tutorial, we will use STAR to map the FASTQ files we retreived from SRA to the human genome.
@@ -933,6 +934,7 @@ for id in `cat SRR_Acc_List.txt`; do
   
   if [ ! -e rsem/$id ]; then
     echo "rsem started"
+	mkdir rsem/$id
     num_fa=`ls -1 rawdata/${id}*.fastq.gz | wc -l`
     if [ $num_fa -eq 1 ]; then
       rsem-calculate-expression --alignments \
@@ -953,6 +955,37 @@ for id in `cat SRR_Acc_List.txt`; do
   fi
 done
 ```
+
+### 2-2-2 Read pseudomapping with kallisto and data quantification
+Doing read mapping or alignment to the reference genome and then based on the gene annotation to do gene expression quantification is the typical procedure to preprocess RNA-seq data, but not the only way. In some scenarios, it is not very pratical to use this typical procedure. Examples include the huge genome problem. The axolotl (*Ambystoma mexicanum*) is a paedomorphic salamander, and it is the master of regenerations. It can regenerate nearly every part of their body including [limbs](https://www.science.org/doi/10.1126/science.aaq0681) and [brains](https://www.science.org/doi/10.1126/science.abp9262), and therefore it is a great model to study regenerations. However, any genomic study on axolotl would encounter one problem, that its genome is huge (\~32 Gb) which is about five times as big as the human genome (\~6.3 Gb). When preprocessing its RNA-seq data, for instance, the huge genome would mean much higher demands on memory usage (>200 GB) and time, which makes it difficult to run even on some computing servers. 
+
+<p align="center">
+<img src="img/axolotl.png"/><br/>
+<sub><i>The super cute axolotl, famous for its capacity of regeneration, and its genome with tremendous size. Image from <a href="https://www.spiegel.de/wissenschaft/natur/axolotl-gehirn-studie-zeigt-einzigartige-regenerationsfaehigkeit-a-53df0972-a538-424b-b98b-abe46098e993">Spiegel Science</a></i></sub>
+</p>
+
+And of course, even for the smaller genomes like human, you may want to further reduce the computational resource it needs for the preprocessing. In such a case, STAR is no longer a good option any more for its highly intensive memory usage. So do we have another option?
+
+The answer is yes, and you don't even need to sacrifty the speed to achieve that, but just a little bit of the accuracy when assigning reads to genes or isoforms. This is so-called pseudomapping or pseudoalignment, with [kallisto](https://pachterlab.github.io/kallisto/) as the most well known example. Kallisto was developed by Nicolas L. Bray and colleagues in Lior Pachter's lab in UC Berkley, US in 2016. There are at least two key points that distinguish it from other read alignment algorithms like STAR:
+1. It compares the sequencing reads to the transcriptome sequences rather than the reference genome sequence
+2. During the comparison, instead of looking for the precise location where the reads are aligned to (doing alignment), it simply looks for the transcripts that share the sequence of the read. This is why it is called "pseudoalignment".
+
+In brief, kallisto indexes the reference transcriptome as a graph of k-mers (all the possible strings with k characters, for nucleotides there would be $4^k$ possible ones). Such a graph is called the transcriptome de Bruijn Graph (T-DBG). With such a graph, every transcript is represented as a path going through different the k-mers on the graph in the order that matches the transcript sequence. In this way, different transcripts can be seen as different directed paths on the graph, and each kmer has a list of transcripts or gene isoforms that pass it through. When comparing the reads with the reference transcriptome, it firstly converts the reads to a set of kmers, and then look for the transcripts passing through each kmer that the read is consisted of. Those transcripts are then intersected across read kmers, resulting in a list of transcripts which generates most if not all the kmers of the read. Those transcripts are considered as the origin of the read, and the read is therefore "aligned" to those transcripts. Here we are not going into more details of the methods, as the detailed and technical information can be found in the [paper](https://www.nature.com/articles/nbt.3519).
+<p align="center">
+<img src="img/kallisto.jpg" /><br />
+<sub><i>Figure 1 of the kallisto paper.</i></sub>
+</p>
+
+Before running kallisto for the pseudoalignment, the reference transcriptome needs to be indexed. There are two options here. Kallisto provides [the transcriptome index for some commonly used species](https://github.com/pachterlab/kallisto-transcriptome-indices/releases), based on their annotations in Ensembl. This is not the newest Ensembl version, and the species you look at may not be available here, but it is fast and safe. The other option is to build the index by ourselves. In that case we need to obtain the FASTA file of the reference transcriptome. For species that's available in UCSC or Ensembl genome browser, they provide download of the reference transcriptome sequences in FASTA file. For human and mouse, the reference transcriptome sequences are also available in GENCODE, and same applies to FlyBase for fruit fly, and WormBase for roundworm. Here for the example data set here, let's download the human transcript sequences from GENCODE, and then build the kallisto index.
+```console
+cd [student folder]
+mkdir transcriptome
+cd transcriptome
+wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/gencode.v41.transcripts.fa.gz
+mkdir kallisto_index
+kallisto index -i kallisto_index/hg38_gencode41 gencode.v41.transcripts.fa.gz
+```
+
 
 
 <style scoped> table { font-size: 0.8em; } </style>
