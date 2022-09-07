@@ -14,9 +14,11 @@
       * [2-2-1 Read mapping with STAR and data quantification](#2-2-1-read-mapping-with-star-and-data-quantification)
       * [2-2-2 Read pseudomapping with kallisto and data quantification](#2-2-2-read-pseudomapping-with-kallisto-and-data-quantification)
     * [2-3 Cross-species comparison](#2-3-cross-species-comparison)
-  * Analyze and compare RNA-seq data
+  * [Analyze and compare RNA-seq data](#analyze-and-compare-rna-seq-data)
+    * [3-1 Introduction to R](#3-1-introduction-to-r)
 
 ## Introduction
+<sub><a href="#top">(Back to top)</a></sub></br>
 Nowadays in biology, the RNA sequencing technology becomes so commonly used that it may not even need much of the introduction. Based on the high-throughput DNA sequencing techniques, the RNA sequencing technology, or RNA-seq in short, measures the presence and quantity of RNA in a biological sample by firstly converting the captured RNA transcripts to cDNA via reverse transcription. Unlike the other techniques which also quantify the transcript abundance (e.g. qPCR), RNA-seq can unbiasedly quantify RNA abundance in the transcriptome level at the same time, and in addition allows the discovery of novel transcripts in a sample.
 
 On the other hand, no RNA-seq experiment would automatically inform any of those biological insights directly. What an RNA-seq experiment gives you is a bunch of "reads", which are the short fragmented sequences that are captured, fragmented, reverse transcribed and measured. One would have to process the data to quantify the abundance of transcripts from every gene, and then further analyze the resulted data. This is what this tutorial is supposed to tell you.
@@ -24,6 +26,7 @@ On the other hand, no RNA-seq experiment would automatically inform any of those
 In the following sections, we will go through the RNA-seq data preprocessing including quality control, mapping and quantification, and then the data analysis such as sample/condition comparison, identification of differentially expressed genes among conditions, and the possible following analysis to interpret the identified differences. Before that, I will also mention some more basic concepts and operations such as how to use the command line interface in a Unix-like system like Linux, how to install the software needed for the procedure, and how to download public RNA-seq data from the SRA data repository.
 
 ## Preparation
+<sub><a href="#top">(Back to top)</a></sub></br>
 In this section, I will mention the stuffs before we even start preprocessing the RNA-seq data, so that you can make sure that you and your computers are both ready for the way afterwards. These stuffs include the followings:
 1. Linux and [Bash (the Bourne Again SHell)](https://www.gnu.org/software/bash/), the most commonly used command line interface in Linux
 2. How to access a computing server via SSH
@@ -31,6 +34,7 @@ In this section, I will mention the stuffs before we even start preprocessing th
 4. SRA and how to retrieve the public RNA-seq data from there
 
 ### 1-1. Linux and Bash, your important buddies for RNA-seq data analysis
+<sub><a href="#top">(Back to top)</a></sub></br>
 I'm pretty sure you know computer and use computer (otherwise you won't be able to see this). However, you may not ever use Linux OS (Linux for short) even though you may have heard of the name somewhere. Meanwhile, you must be very familiar with Microsoft Windows and/or Apple macOS. These three falls into the same concept: the operating system (OS) of a computer. An OS is probably the most important software on a computer, which manages computer hardware, software resource and provides services for other programs. It runs at the lowest level, and everything else you use on the computer relies on it. On desktop computers or laptops, Microsoft Windows and Apple macOS are the two most commonly used OS. However, this is not the case for other computers such as computing servers and high-performance clusters (HPC), which are important foundations of the nowaday data science, and of course, bioinformatics. For those computers, Linux is of much higher preference, for its computing efficiency, flexibility, stability, and security. Indeed, more than 90% of the world's fastest supercomputers run on Linux, and because of that, people relying on high-performance computing develop lots of tools that can be quite easily set up in Linux but not necessarily in the other two OS, which also contributes to the bias of choice.
 
 As one of the fields that require high-performancing and large-resource computing, bioinformatics and computational biology also heavily uses Linux. Actually, <ins>**many software needed for the RNA-seq data preprocessing are only available in Linux**</ins> (and other Unix-like systems, but won't be further mentioned in this tutorial). Therefore, some basic understanding of how to use Linux is critical.
@@ -211,6 +215,7 @@ Specifically for the main topic of this tutorial, to preprocess and analyze RNA-
 However, there are so many stuffs one would have to talk about the scripting in Bash, as many as introducing a programming language, it won't be covered further here. Meanwhile, there are lots of great materials one can find online (for instance, this [cheatsheet](https://devhints.io/bash)), as well as books. If possible, I would really encourage you to check and get a bit into it, and very likely you won't regret.
 
 ### 1-2. Access the computing server 
+<sub><a href="#top">(Back to top)</a></sub></br>
 It is most likely that you are using your own computer right now looking at this tutorial, and you might be now thinking to use it for the RNA-seq data preprocessing and analysis, at least to go through the remaining part of the tutorial. This may not be a good idea, as your own computer, which is very much likely to be an ordinary desktop or laptop. However, while it could have been powerful enough for daily usage for sure and maybe also to play fancy AAA games without frame drops, it may not be enough for going through every step in the tutorial. Different tasks need different resources. A powerful graphics card is critical for gaming and on top of that, an Intel Core-i9 12th gen with 16 cores plus 16GB RAM (memory) would have made your computer powerful enough for most games. On the other hand, for most of the preprocessing and analysis of RNA-seq data, at least those will be mentioned in this tutorial, no graphic card would be needed at all, while RAM would become a main issue, that 64GB or more would be expected to get everything done; 16 cores CPU would be probably enough in most of the time, but sometimes during the analysis you may want to use large-scale parallelization to speed things up, and start to hope for availability of 100 cores.
 
 Therefore, we rarely use personal computers for the data analysis. Instead, we use high performance computing servers or clusters. They are machines with large number of CPU cores and memories, and usually shared by many users who can all access and use the machine at the same time. And of course, this "access" would no longer be the physical access sitting in front of its screen and type directly on its keyboard. Actually many of those machine has no screen and keyboard (and of course no mouse as well) attached. Then how shall we use them?
@@ -258,6 +263,7 @@ No matter in which way, once you login the server successfully, you are ready to
 
 
 ### 1-3. Install the required tools with the help from conda
+<sub><a href="#top">(Back to top)</a></sub></br>
 Now you have access to the server, and hopefully also know something about how to use it via command line. Now it's time to set up all the tools needed for the following data preprocessing and analysis. Here I summarize some software which will be introduced and/or used later.
 
 |Software|Link|Function|Compatible OS|
@@ -343,6 +349,7 @@ It would ask you to confirm the installation of not only the four requested soft
 >Conda has more functionalities that just installing software more easily. It is an environment manager, meaning that you can create, manage, delete and use different environment where different software are installed while making sure those different environments would not affect each other. This is especially useful when you want to use certain versions of software in some scenarios but not the others. Having too many software installed in the same environment also makes it more difficult and time-consumping to resolve the dependencies when installing new packages or upgrading the existing ones. Therefore, to have different environments set up for different purposes could be a very useful guideline in the future.
 
 ### 1-4. Get the public RNA-seq data from SRA
+<sub><a href="#top">(Back to top)</a></sub></br>
 Now we have the computational environment ready for the preprocessing. We just need to data to start. As one can easily expect, there are two sources of data: the in-house data that are generated freshly by the lab for specific biological questions, and the public data which have been released and used for answer certain questions, but can be reanalyzed solely or together with other data for the same or related questions.
 
 There are several huge repositories in the world for high-throughput sequencing data. The major players include [NCBI Sequence Read Archive (SRA)](https://www.ncbi.nlm.nih.gov/sra) by NCBI in the US, [European Nucleotide Archive (ENA)](https://www.ebi.ac.uk/ena/browser/home) by EMBL-EBI in the UK, and [DDBJ Sequence Read Archive (DRA)](https://www.ddbj.nig.ac.jp/dra/index-e.html) by the DDBJ Center in Japan. These three repositories are also members of International Nucleotide Sequence Database Collaboration (INSDC), and cross-backup each other, meaning that data submitted to any one of the three databases are also accessible from the other two.
@@ -527,6 +534,7 @@ Here, $e$ is the estimated probability of the base call being wrong. Therefore, 
 To represent the Q scores of all the based in a sequence in the FASTQ format, the numeric Q score of each base is encoded into a compact form based on the [ASCII codes](https://www.ascii-code.com/). Basically, the estimated Q score represented as an integer is represented by the character with the ASCII code equal to $Q+33$. It has the 33 component because Q is strictly non-negative with the minimum of 0 meaning 0% accuracy, and 33 is the smallest ASCII code that defines a one-character symbol (!). 
 
 ## Preprocessing of RNA-seq data
+<sub><a href="#top">(Back to top)</a></sub></br>
 Now we have the tools ready, and the data ready. It is time to move on to the next step, to preprocess the RNA-seq data. In general it contains the following steps:
 1. Quality control
 2. Read mapping or pseudomapping
@@ -534,6 +542,7 @@ Now we have the tools ready, and the data ready. It is time to move on to the ne
 4. Generate the expression matrix with sample metadata table for the following analysis
 
 ### 2-1 Quality control of RNA-seq data
+<sub><a href="#top">(Back to top)</a></sub></br>
 Before actually processing the data, it is important to make sure that the data is of high quality.
 
 The quality of a RNA-seq data contains different aspects. The sequencing quality, represented by the quality score for each base in each read, is one of the very first thing one should consider. It varies from one base to another base, and from one read to another. We can therefore look at the distribution of the Q score per loci across all reads. Usually the sequencing reads have relatively low quality on the two sides (especially the end) and higher quality in the middle, and this is the reason why we look at the per loci quality distribution across reads. Another reason to look at that is because if it is indeed the case that the start and/or the end of reads systematically have too low quality, one can easily fix it by trimming the first and the last bases of all the reads. This will be mentioned in more details later.
@@ -618,7 +627,9 @@ done
 Also to keep in mind that fastp is able to do more complicated manipulations and examples are shown in its [github page](https://github.com/OpenGene/fastp). It also provides a QC summary, not as comprehensive as FastQC does but still reasonable. However, we won't go into those details in this tutorial.
 
 ### 2-2 Read mapping/pseudomapping and quantification
+<sub><a href="#top">(Back to top)</a></sub></br>
 #### 2-2-1 Read mapping with STAR and data quantification
+<sub><a href="#top">(Back to top)</a></sub></br>
 Once the quality of the data is confirmed, we need to convert those millions of reads per sample into the gene- or transcript-level quantification. This would need the assignment of reads to genes or transcripts. To do this, the mostly common first step is for each read, to look for the genomic region that match with the read, given the complete genomic sequences. The identified region is then most likely the region being transcribed and generate the sequenced read in the end. This step of looking for the matched genomic regions for reads is called read genome mapping or alignment.
 
 There are different tools, or aligners, that have been developed for this purpose. The most famous examples include [Tophat/Tophat2](https://ccb.jhu.edu/software/tophat/index.shtml)/[HISAT2](https://daehwankimlab.github.io/hisat2/) and [STAR](https://github.com/alexdobin/STAR). As the commonly used modern aligners, HISAT2 and STAR shares quite some features, such as their high-efficiency, and their support of soft-trimming for low-quality bases at the ends of reads. They also have their own adventage and disadventage. HISAT2 uses fewer computational resource than STAR (particularly memory) and has better support for SNPs (single-nucleotide polymorphism) that in the same locus on the genome different individuals can have different nucleotides. On the other hand, STAR is suggested to provide more accurate alignment results. It also supports varied ways for the next step to quantify transcript abundance. In this tutorial, we will use STAR to map the FASTQ files we retreived from SRA to the human genome.
@@ -958,6 +969,7 @@ done
 ```
 
 #### 2-2-2 Read pseudomapping with kallisto and data quantification
+<sub><a href="#top">(Back to top)</a></sub></br>
 Doing read mapping or alignment to the reference genome and then based on the gene annotation to do gene expression quantification is the typical procedure to preprocess RNA-seq data, but not the only way. In some scenarios, it is not very pratical to use this typical procedure. Examples include the huge genome problem. The axolotl (*Ambystoma mexicanum*) is a paedomorphic salamander, and it is the master of regenerations. It can regenerate nearly every part of their body including [limbs](https://www.science.org/doi/10.1126/science.aaq0681) and [brains](https://www.science.org/doi/10.1126/science.abp9262), and therefore it is a great model to study regenerations. However, any genomic study on axolotl would encounter one problem, that its genome is huge (\~32 Gb) which is about five times as big as the human genome (\~6.3 Gb). When preprocessing its RNA-seq data, for instance, the huge genome would mean much higher demands on memory usage (>200 GB) and time, which makes it difficult to run even on some computing servers. 
 
 <p align="center">
@@ -1041,6 +1053,7 @@ done
 ```
 
 ### 2-3 Cross-species comparison
+<sub><a href="#top">(Back to top)</a></sub></br>
 Now we have mentioned how to retrieve the reference genome/transcriptome sequences, do read alignment to the reference for your RNA-seq data with different tools, and quantify the expression of genes and transcripts. They should be work for most cases. There is one type of study that would need extra effort: the cross-species comparison. Different species has different reference genomes, different gene annotations, and of course, different reference transcritpome sequences. Ideally, this can be solved by
 1. Do read alignment for the RNA-seq data to the respective genomes
 2. Quantify gene expression for samples of different species using respective gene annotations
@@ -1064,6 +1077,19 @@ To solve the problem, researcher have developed different strategies to unify th
 
 
 ## Analyze and compare RNA-seq data
+<sub><a href="#top">(Back to top)</a></sub></br>
+Now we have preprocessed the RNA-seq data, and have the gene expression levels quantified for every sample. It is time to analyze and compare them to get some biological insight! In the following section, we will read the data into the R environment, write some R scripts there to compare those different RNA-seq samples in general, use some R packages or customized scripts to identify genes with differential expression between conditions, and try to interpret them in a way to gain some biological insight.
 
+### 3-1 Introduction to R
+<sub><a href="#top">(Back to top)</a></sub></br>
+Since our analysis will be done in R, it is important to firstly give a brief introduction to R. [R](https://www.r-project.org/) is a free software environment and programming language for statistical computing and graphics, and is available in varied OS including UNIX/Unix-like and Windows. It is widely used in quantitative genomics and biology, as well as many other fields (especially in academia) that heavily needs statistics. It has huge amount of tools (the R packages) developed by programmers and researchers all around the world, which further encourages people to join the user team. It also has excellent visualization toolkits (I think it is the greatest among all the programming languages so far), which greatly facilitate the visualization of any analysis result. It has drawbacks of course. It is well-known to be slow compared to other languages like C (this is always the champion), Java and even Python and Perl. It has pretty weak support of the "modern" machine learning algorithms based on deep neural network or deep learning (DL) (for this Python has the most production-ready architecture). Also, it doesn't support the really huge data (e.g. those with billions of entries) which could be pretty common in many fields. All those limit the further application of R, and therefore you would never see R as the most commonly used programming language in the world. Still, for any scenario where data size is not a concern, a light speed performance is not needed, and no DL model is needed, R provides an excellent environment for exploring and analyzing the data.
+
+R is not a complicated lanugage if you compare to any other. Indeed, it is rather simple. However, it is not yet as simple as becoming an expert in 5 minutes. It needs at least a full lecture to introduce all the basic grammars, not to mention the more advanced skills and techniques. It would be far too much if we include them in this tutorial. Instead, for every step of the analysis, I will try to provide the complete script so that hopefully you can do copy-paste (maybe with some minor modification) to just get it done. However, it is highly recommended to spend some effort to learn the language, even just to get the basic idea about every part of the script, so that you know much better about what we are doing, and also debug any issue you may encounter, no matter when walking through the tutorial, doing the homework task, or doing a real research project.
+
+Here are some resources for learning R, that you can find online:
+* [An Introduction to R](https://cran.r-project.org/doc/manuals/r-release/R-intro.html), the official manual
+* [An Introduction to R](https://intro2r.com/), same name, but different content. It is an e-book by Alex Douglas, Deon Roos, Francesca Mancini, Ana Couto and David Lusseau who all have lots of experiences on using and teaching R
+* [R for Data Science](https://r4ds.had.co.nz/), about how to do data science in R, and includes quite some modern elements of R (e.g. tidyverse, pipe)
+* [R Graphics Cookbook](https://r-graphics.org/), about the graphics features of R, especially with ggplot2, the widely used visualization framework in R which was originally created by Hadley Wickham in 2005 to implement "The Grammar of Graphics".
 
 <style scoped> table { font-size: 0.8em; } </style>
