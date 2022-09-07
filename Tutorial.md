@@ -12,7 +12,8 @@
     * [2-1 Quality control of RNA-seq data](#2-1-quality-control-of-rna-seq-data)
     * [2-2 Read mapping/pseudomapping and quantification](#2-2-read-mappingpseudomapping-and-quantification)
       * [2-2-1 Read mapping with STAR and data quantification](#2-2-1-read-mapping-with-star-and-data-quantification)
-	  * [2-2-2 Read pseudomapping with kallisto and data quantification](#2-2-2-read-pseudomapping-with-kallisto-and-data-quantification)
+      * [2-2-2 Read pseudomapping with kallisto and data quantification](#2-2-2-read-pseudomapping-with-kallisto-and-data-quantification)
+    * [2-3 Cross-species comparison](#2-3-cross-species-comparison)
   * Analyze and compare RNA-seq data
 
 ## Introduction
@@ -616,8 +617,8 @@ done
 
 Also to keep in mind that fastp is able to do more complicated manipulations and examples are shown in its [github page](https://github.com/OpenGene/fastp). It also provides a QC summary, not as comprehensive as FastQC does but still reasonable. However, we won't go into those details in this tutorial.
 
-## 2-2 Read mapping/pseudomapping and quantification
-### 2-2-1 Read mapping with STAR and data quantification
+### 2-2 Read mapping/pseudomapping and quantification
+#### 2-2-1 Read mapping with STAR and data quantification
 Once the quality of the data is confirmed, we need to convert those millions of reads per sample into the gene- or transcript-level quantification. This would need the assignment of reads to genes or transcripts. To do this, the mostly common first step is for each read, to look for the genomic region that match with the read, given the complete genomic sequences. The identified region is then most likely the region being transcribed and generate the sequenced read in the end. This step of looking for the matched genomic regions for reads is called read genome mapping or alignment.
 
 There are different tools, or aligners, that have been developed for this purpose. The most famous examples include [Tophat/Tophat2](https://ccb.jhu.edu/software/tophat/index.shtml)/[HISAT2](https://daehwankimlab.github.io/hisat2/) and [STAR](https://github.com/alexdobin/STAR). As the commonly used modern aligners, HISAT2 and STAR shares quite some features, such as their high-efficiency, and their support of soft-trimming for low-quality bases at the ends of reads. They also have their own adventage and disadventage. HISAT2 uses fewer computational resource than STAR (particularly memory) and has better support for SNPs (single-nucleotide polymorphism) that in the same locus on the genome different individuals can have different nucleotides. On the other hand, STAR is suggested to provide more accurate alignment results. It also supports varied ways for the next step to quantify transcript abundance. In this tutorial, we will use STAR to map the FASTQ files we retreived from SRA to the human genome.
@@ -956,7 +957,7 @@ for id in `cat SRR_Acc_List.txt`; do
 done
 ```
 
-### 2-2-2 Read pseudomapping with kallisto and data quantification
+#### 2-2-2 Read pseudomapping with kallisto and data quantification
 Doing read mapping or alignment to the reference genome and then based on the gene annotation to do gene expression quantification is the typical procedure to preprocess RNA-seq data, but not the only way. In some scenarios, it is not very pratical to use this typical procedure. Examples include the huge genome problem. The axolotl (*Ambystoma mexicanum*) is a paedomorphic salamander, and it is the master of regenerations. It can regenerate nearly every part of their body including [limbs](https://www.science.org/doi/10.1126/science.aaq0681) and [brains](https://www.science.org/doi/10.1126/science.abp9262), and therefore it is a great model to study regenerations. However, any genomic study on axolotl would encounter one problem, that its genome is huge (\~32 Gb) which is about five times as big as the human genome (\~6.3 Gb). When preprocessing its RNA-seq data, for instance, the huge genome would mean much higher demands on memory usage (>200 GB) and time, which makes it difficult to run even on some computing servers. 
 
 <p align="center">
@@ -1038,6 +1039,31 @@ for id in `cat SRR_Acc_List.txt`; do
   fi
 done
 ```
+
+### 2-3 Cross-species comparison
+Now we have mentioned how to retrieve the reference genome/transcriptome sequences, do read alignment to the reference for your RNA-seq data with different tools, and quantify the expression of genes and transcripts. They should be work for most cases. There is one type of study that would need extra effort: the cross-species comparison. Different species has different reference genomes, different gene annotations, and of course, different reference transcritpome sequences. Ideally, this can be solved by
+1. Do read alignment for the RNA-seq data to the respective genomes
+2. Quantify gene expression for samples of different species using respective gene annotations
+3. Look for orthologous gene pairs between different species (largely available in Ensembl via its BioMart data-mining tool) and compare their expression levels
+
+This procedure should work when the species to compare both have high-quality genome and gene annotation, and orthologous gene pairs can be easily retrieved. Ideally the species are not too evolutionarily distal from each other so that majority of the orthologous genes are one-to-one so that the comparison is easily. Therefore, this way should work pretty nicely for human versus mouse comparison, and also applicable to the more distal comparison (e.g. fruit fly versus mouse).
+
+However, there are also many studies, particularly those focusing on species evolution, that involve species which don't have high-quality gene annotation and/or reference genomes. For example, although we only focus on the human samples in the tutorial, the [paper of the example data set](https://www.nature.com/articles/nn.4548) is actually an evolutionary study comparing human, chimpanzee and rhesus macaque. The reference genomes of the two non-human primate species have medium quality, usable but for sure not as good as the human one. More importantly, their gene annotations are much worse than the human counterpart. Many genes are missing, the isoform information of genes are incomplete, and the less-conserved regions of genes (e.g. the 5'- and 3'UTRs) are often missing. Those technical differences can introduce biases, which can be pretty large sometimes, and make the comparison unfair.
+
+To solve the problem, researcher have developed different strategies to unify the annotations of different species so that the gene quantification of different species can be compared directly.
+* For example, UCSC Genome Browser provides the [LiftOver](https://genome.ucsc.edu/cgi-bin/hgLiftOver) tool which can convert genome coordinates and annotation files between different genome assemblies based on the whole-genome alignment between genome assemblies. The tool is recommended to only convert different genome versions of the same species, but can be also applied to different species genomes to identify the orthologous genomic regions between two species. One can then use LiftOver to identify the orthologous region of each annotated exon in one species in another.
+* Another strategy is to use [BLAT](https://genome.ucsc.edu/cgi-bin/hgBlat) developed by Jim Kent at UCSC in the early 2000s, [GMAP](http://research-pub.gene.com/gmap/) developed by Thomas Wu in Genentech also in the early 2000s, [lra](https://github.com/ChaissonLab/LRA) that was recently developed by Jingwen Ren in Mark Chaisson lab at USC, or other aligners developed for aligning long reads or contigs to the reference genome, to align the reference transcriptome sequences of one species to the genome of the other species to obtain the orthologous genomic regions, and thus the orthologous transcriptome.
+* A third strategy, which was used in the example data set paper, is to build a [consensus genome](https://rnajournal.cshlp.org/content/20/7/1103) of the species to be compared based on their whole-genome alignment. This consensus genome shares the same genomic coordinates as the reference genome of one species that has the best gene annotations (anchor species). When doing read mapping, reads of all samples, regardless species, are aligned to the consensus genome, with gene expression quantified based on the gene annotation of the anchor species. This is an easy-to-go approach for the close species (like human versus non-human primates), but won't work nicely once the species are too far away evolutionarily.
+
+>**NOTE**
+>The consensus genome of human (hg38), chimpanzee (panTro5) and rhesus macaque (rheMac8) is available [here](https://polybox.ethz.ch/index.php/s/euZcPNkxqukcXwy). It was original built for this [paper](https://www.nature.com/articles/s41586-019-1654-9) in 2019 comparing early brain development of human, chimpanzee and rhesus macaque using the brain organoid system. The genomic coordiantes are shared with the human reference genome hg38, and therefore with the human gene annotation applicable. In CLI, it can be downloaded with 
+>```
+>wget -O consensus_genome.fa.gz https://polybox.ethz.ch/index.php/s/euZcPNkxqukcXwy
+>```
+>The consensus genome used in the example data set paper was for hg19, panTro4 and rheMac3 genomes, which is obviously outdated.
+
+
+## Analyze and compare RNA-seq data
 
 
 <style scoped> table { font-size: 0.8em; } </style>
