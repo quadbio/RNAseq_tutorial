@@ -1092,4 +1092,14 @@ Here are some resources for learning R, that you can find online:
 * [R for Data Science](https://r4ds.had.co.nz/), about how to do data science in R, and includes quite some modern elements of R (e.g. tidyverse, pipe)
 * [R Graphics Cookbook](https://r-graphics.org/), about the graphics features of R, especially with ggplot2, the widely used visualization framework in R which was originally created by Hadley Wickham in 2005 to implement "The Grammar of Graphics".
 
-<style scoped> table { font-size: 0.8em; } </style>
+In the bs-studentsvr04 server, R (4.2.1) has been installed and can be used directly. Indeed, during your installation of the tools with conda, your conda environment should also have an R installed, so there would be at least two different Rs you can use.
+
+>**NOTE**
+>* If your conda base environment is set to be automatically on (this is the default after running `conda init`), you would have the R in your conda as the default one, and can be run by typing `R` in CLI. If you want to use the one installed in the system, your can either do `/usr/local/bin/R`, or you shall run `conda deactivate` first to deactivate your conda environment, and then run `R`. Just be aware that you won't be able to use the tools installed with conda after that, unless you start a new login session, or run `conda activate base` to activate the base conda environment again
+>* Since running the following analysis should require less memory, it is in principle possible to just use your personal computer. If you want to do that, installing R at your personal computer is also not complicated. Just visit the [R website](https://www.r-project.org/), go to the download page, choose a mirror server that fits you the most (or just the first one "0-Cloud" if you don't want to spend the effort), then click on the link for the installer on your OS.
+>* Although installing R is quite simple, installing additional R packages could be quite painful as many require additional compiling process. Particularly for the Windows users, Windows doesn't natively support the compiling from source code. Therefore, besides R, you also need [RTools](https://cran.r-project.org/bin/windows/Rtools/) which provides the tools in Windows for building R packages from source.
+
+#### RStudio
+
+
+<br/><style scoped> table { font-size: 0.8em; } </style>
