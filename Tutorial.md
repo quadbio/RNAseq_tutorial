@@ -1100,6 +1100,14 @@ In the bs-studentsvr04 server, R (4.2.1) has been installed and can be used dire
 >* Although installing R is quite simple, installing additional R packages could be quite painful as many require additional compiling process. Particularly for the Windows users, Windows doesn't natively support the compiling from source code. Therefore, besides R, you also need [RTools](https://cran.r-project.org/bin/windows/Rtools/) which provides the tools in Windows for building R packages from source.
 
 #### RStudio
+There are two ways of using R. One is to write all the R script in a file, and then let R to run it through altogether. This can be done with the command `Rscript [filename]`, but it is not the common way of running R script. The typical way of using R is to use its interactive interface, where you type in the script line-by-line and see the result immediately. Meanwhile, you may not feel very pleasant using the native R interface. It is definitely fine to use it (there was more than 10 years time that I only used it for R), but you will be appreciated if there is any tool that can provide better experience.
 
+This is what [RStudio](https://www.rstudio.com/) brings you. It is an integrated development environment (IDE) for R, which includes a console (basically the native R CLI interface), syntax-highlighting editor that supports direct code execution (this is a great feature), as well as tools for plotting, history, debugging and workspace management. It is available in two formats: RStudio Desktop is a regular desktop application while RStudio Server runs on a remote server and allows accessing RStudio using a web browser. Note that RStudio doesn't include R itself, so you shall make sure R is installed in the machine, so that your RStudio can call the installed R for running the codes.
+
+In the bs-studentsvr04 server, there is an RStudio server installed and bound to R in the system (`/usr/local/bin/R`). To use it, you shall firstly make sure that your personal computer has connected to the ETH network. Then you can visit the following link in your browser (e.g. Google Chrome): http://bs-studentsvr04:8788/. It should lead you to the login page of the RStudio server there.
+<p align="center"><img src="img/rstudio_server_login.png" /></p>
+
+Then, enter the same username and password as you use for SSH login to the server. Once it is approved, you will see the RStudio server window.
+<p align="center"><img src="img/rstudio.png" /></p>
 
 <br/><style scoped> table { font-size: 0.8em; } </style>
