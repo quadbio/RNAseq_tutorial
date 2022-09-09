@@ -1,6 +1,6 @@
 # Tutorial for bulk RNA-seq data preprocessing and analysis
 #### Compiled by Zhisong He
-#### Updated on 07 Sept 2022
+#### Updated on 09 Sept 2022
 ### Table of Content
   * [Introduction](#introduction)
   * [Preparation](#preparation)
@@ -1151,6 +1151,60 @@ expr <- sapply(samples, function(sample){
 >* The `setNames` function returns a named vector, with the first input as the values and the second input as the names (therefore, they should share the same length)
 >* In R, `<-` is used to represent value assignment. It is equivalent to `=`, which is also used by most of the other programming languages. And it is also possible to use `->`, which assigns the result obtained by the left hand side to the variable on the right hand side (so opposite as `<-`)
 
-We also need to metadata of samples.
+We also need to metadata of samples. Do you remember when retreiving the SRA accession we not only downloaded just the accession number list, but also the metadata table (default filename SraRunTable.txt)? If the data submitter include all the critical information during the data submission, this table should have contained all the information you need and the only thing you need to do now is to read it in. For the example here, of course we also need some extra information (the layer information) of the samples, which have been mentioned above. Therefore, what we need to do now is to copy-paste the information table shown above into a table, read in both tables into R, and then combine them based on the sample IDs. Now assume you have saved that layer information in a TAB-delimited table text file called "meta_additional.tsv" in your working directory.
+```R
+library(dplyr)
+
+meta <- read.csv("meta_additional.tsv", sep="\t", header=T) %>%
+  inner_join(read.csv("SraRunTable.txt", header=T),
+             by = c("Sample" = "Sample.Name"),
+             suffix = c("",".y")) %>%
+  select(c("Run","Individual","Age","Sample","Layer"))
+
+expr <- expr[,meta$Run]
+```
+
+>**NOTE**
+>Here we use quite some tidyverse features provided by the `dplyr` package:
+>* `%>%` is the pipe operator (similar to `|` in Bash). The output of the previous action is used as the first parameter of the next action
+>* The `inner_join` function joins two data frames together based on the anchoring columns, and only the records appears in both data frames are remained
+>* The `select` function outputs only the given columns among all the columns in a data frame
+>
+>So what was done here is
+>1. Read the table with layer information
+>2. Join the table with the table with SRR accession numbers, based on the sample ID that's shared by the two tables
+>3. Select and output only the five given columns
+>
+>And the last line is to make sure the columns of the expression matrix are in the same order as rows in the metadata
+
+Optionally we also want to get some more information about the genes than just the GENCODE IDs. This can be done by searching at the Ensembl database using the `biomaRt` package.
+```R
+library(biomaRt)
+ensembl <- useEnsembl(biomart = "ensembl",
+                      dataset = "hsapiens_gene_ensembl")
+meta_genes <- getBM(attributes = c("ensembl_gene_id",
+                                   "ensembl_gene_id_version",
+                                   "hgnc_symbol",
+                                   "description",
+                                   "chromosome_name",
+                                   "start_position",
+                                   "end_position",
+                                   "strand"),
+                    filters = "ensembl_gene_id_version",
+                    values = rownames(expr),
+                    mart = ensembl) %>%
+  right_join(data.frame(ensembl_gene_id_version = rownames(expr)),
+             by = "ensembl_gene_id_version") %>%
+  distinct(ensembl_gene_id_version, .keep_all = TRUE)
+expr <- expr[meta_genes$ensembl_gene_id_version,]
+```
+
+>**NOTE**
+>* `useEnsembl` and `getBM` are functions in the `biomaRt` packages. The `useEnsembl` function opens a connection to the BioMart tool of the Ensembl database, specifying the human gene information data set as the target. The `getBM` function retrieves information through the opened connection to BioMart (`mart`), given the wanted attributes (`attributes`) to return and, the filter attributes (`filters`) and the constraint values (`values`)
+>* There are other data sets for other species and/or other information. To list all the possible data sets related to gene information, use `listDatasets(useEnsembl(biomart = "ensembl"))`
+>* `listAttributes(ensembl)` and `listFilters(ensembl)` can list all the possible attributes and filters of the given BioMart dataset
+>* The `right_join` function is similar to the `inner_join` function above, both of which are tidyverse features. What makes `right_join` different is that it keeps all the entries of the data frame on the right hand side
+>* The `distinct` function subset the unique rows, optionally to focus on a subset of columns only. If `.keep_all` is set to TRUE, all columns are kept instead of only the focused ones.
+>* Similarly, the last line is to make sure the rows of the expression matrix are in the same order as rows in the gene metadata
 
 <br/><style scoped> table { font-size: 0.8em; } </style>
