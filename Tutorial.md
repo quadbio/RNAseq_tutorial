@@ -1180,6 +1180,7 @@ expr <- expr[,meta$Run]
 Optionally we also want to get some more information about the genes than just the GENCODE IDs. This can be done by searching at the Ensembl database using the `biomaRt` package.
 ```R
 library(biomaRt)
+
 ensembl <- useEnsembl(biomart = "ensembl",
                       dataset = "hsapiens_gene_ensembl")
 meta_genes <- getBM(attributes = c("ensembl_gene_id",
@@ -1196,6 +1197,7 @@ meta_genes <- getBM(attributes = c("ensembl_gene_id",
   right_join(data.frame(ensembl_gene_id_version = rownames(expr)),
              by = "ensembl_gene_id_version") %>%
   distinct(ensembl_gene_id_version, .keep_all = TRUE)
+
 expr <- expr[meta_genes$ensembl_gene_id_version,]
 ```
 
