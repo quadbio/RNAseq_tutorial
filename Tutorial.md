@@ -16,6 +16,7 @@
     * [2-3 Cross-species comparison](#2-3-cross-species-comparison)
   * [Analyze and compare RNA-seq data](#analyze-and-compare-rna-seq-data)
     * [3-1 Introduction to R](#3-1-introduction-to-r)
+    * [3-2 Import the data to R](#3-2-import-the-data-to-r)
 
 ## Introduction
 <sub><a href="#top">(Back to top)</a></sub></br>
@@ -1109,5 +1110,47 @@ In the bs-studentsvr04 server, there is an RStudio server installed and bound to
 
 Then, enter the same username and password as you use for SSH login to the server. Once it is approved, you will see the RStudio server window.
 <p align="center"><img src="img/rstudio.png" /></p>
+
+Now you can create a new R script file by clicking the <img src="img/new_r_script.png"> button, and start to write R script there. You can easily execute the line you write with Ctrl+Enter.
+
+#### Install required R packages
+In the following analysis of the RNA-seq data, we need several additional R packages which are not preinstalled together with R. The following script should be able to install them. In the R console (either at the terminal or the R console in the RStudio server), do
+```R
+install.packages(c("tidyverse","BiocManager"))
+BiocManager::install(c("biomaRt","DESeq2","edgeR"))
+```
+
+>**NOTE**
+>There are different ways of installing R packages:
+>1. Use `install.packages` to download and install packages from CRAN-like repositories or from local files
+>2. For packages in the [*Bioconductor* project](https://bioconductor.org/), use the `install` function in the `BiocManager` package (can be installed with `install.packages`) to install.
+>3. For packages which are not submitted to either CRAN or Bioconductor, but archived at GitHub, for instance, use the `install_github` function in the `devtools` package (can be installed with `install.packages`) to install.
+>
+>So in the above script, we firstly use `install.packages` to install all the packages in the [tidyverse collection](https://www.tidyverse.org/), as well as the Bioconductor package manager "BiocManager", and then use the `install` function there to further install the three Bioconductor packages. Note that all the three approaches also detect dependencies of the packages to install, and install also those packages beforehand.
+
+### 3-2 Import the data to R
+To do the analysis, we need to firstly import the data we need, including the gene expression quantification of all samples, as well as the metadata information of the samples. For the gene expression values, here we are going to use the TPM values quantified by the STAR/RSEM pipeline.
+```R
+setwd("/local0/students/hezhi")
+
+samples <- list.files("rsem")
+expr <- sapply(samples, function(sample){
+  file <- paste0("rsem/",sample,"/","sample",".genes.results")
+  quant <- read.csv(file, sep="\t", header=T)
+  tpm <- setNames(quant$TPM, quant$gene_id)
+  return(tpm)
+})
+```
+
+>**NOTE**
+>* The `setwd` function change the working directory of R (the default directory is where you run R if you use R from the terminal, or the home directory if you use RStudio)
+>* The `list.files` function lists all the files/directories in a folder
+>* The `sapply` function is among the apply() function collection. It takes a list or vector as the input, apply the same operation (defined by a function which can be either imported from any package or fully customized) to each element, and gives output in vector or matrix if possible (all the operations result in vectors with the same length), or a list otherwise
+>* The `paste0` function pastes multiple character strings into one with no gap in between. It is a specialized version of `paste` where one can specify the characters put between the nearby strings.
+>* The `read.csv` function reads by default a CSV (comma-separated values) file into a data.frame (similar to a table), but by changing the `sep` parameter it can be used to read in a text-based tables with different characters as the delimiter
+>* The `setNames` function returns a named vector, with the first input as the values and the second input as the names (therefore, they should share the same length)
+>* In R, `<-` is used to represent value assignment. It is equivalent to `=`, which is also used by most of the other programming languages. And it is also possible to use `->`, which assigns the result obtained by the left hand side to the variable on the right hand side (so opposite as `<-`)
+
+We also need to metadata of samples.
 
 <br/><style scoped> table { font-size: 0.8em; } </style>
