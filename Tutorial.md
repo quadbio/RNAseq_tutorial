@@ -17,7 +17,7 @@
   * [Analyze and compare RNA-seq data](#analyze-and-compare-rna-seq-data)
     * [3-1 Introduction to R](#3-1-introduction-to-r)
     * [3-2 Import data to R](#3-2-import-data-to-r)
-    * [3-3 Comparison of transcriptomic profiles across samples](#3-3-comparison-of-transcriptomic-profiles-acrosss-samples)
+    * [3-3 Comparison of transcriptomic profiles across samples](#3-3-comparison-of-transcriptomic-profiles-across-samples)
 
 ## Introduction
 <sub><a href="#top">(Back to top)</a></sub></br>
