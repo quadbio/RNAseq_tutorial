@@ -1,6 +1,6 @@
 # Tutorial for bulk RNA-seq data preprocessing and analysis
 #### Compiled by Zhisong He
-#### Updated on 09 Sept 2022
+#### Updated on 12 Sept 2022
 ### Table of Content
   * [Introduction](#introduction)
   * [Preparation](#preparation)
@@ -16,7 +16,8 @@
     * [2-3 Cross-species comparison](#2-3-cross-species-comparison)
   * [Analyze and compare RNA-seq data](#analyze-and-compare-rna-seq-data)
     * [3-1 Introduction to R](#3-1-introduction-to-r)
-    * [3-2 Import the data to R](#3-2-import-the-data-to-r)
+    * [3-2 Import data to R](#3-2-import-data-to-r)
+    * [3-3 Comparison of transcriptomic profiles across samples](#3-3-comparison-of-transcriptomic-profiles-acrosss-samples)
 
 ## Introduction
 <sub><a href="#top">(Back to top)</a></sub></br>
@@ -1117,7 +1118,7 @@ Now you can create a new R script file by clicking the <img src="img/new_r_scrip
 In the following analysis of the RNA-seq data, we need several additional R packages which are not preinstalled together with R. The following script should be able to install them. In the R console (either at the terminal or the R console in the RStudio server), do
 ```R
 install.packages(c("tidyverse","BiocManager"))
-BiocManager::install(c("biomaRt","DESeq2","edgeR"))
+BiocManager::install(c("biomaRt","sva","DESeq2","edgeR"))
 ```
 
 >**NOTE**
@@ -1128,7 +1129,8 @@ BiocManager::install(c("biomaRt","DESeq2","edgeR"))
 >
 >So in the above script, we firstly use `install.packages` to install all the packages in the [tidyverse collection](https://www.tidyverse.org/), as well as the Bioconductor package manager "BiocManager", and then use the `install` function there to further install the three Bioconductor packages. Note that all the three approaches also detect dependencies of the packages to install, and install also those packages beforehand.
 
-### 3-2 Import the data to R
+### 3-2 Import data to R
+<sub><a href="#top">(Back to top)</a></sub></br>
 To do the analysis, we need to firstly import the data we need, including the gene expression quantification of all samples, as well as the metadata information of the samples. For the gene expression values, here we are going to use the TPM values quantified by the STAR/RSEM pipeline.
 ```R
 setwd("/local0/students/hezhi")
@@ -1175,7 +1177,9 @@ expr <- expr[,meta$Run]
 >2. Join the table with the table with SRR accession numbers, based on the sample ID that's shared by the two tables
 >3. Select and output only the five given columns
 >
->And the last line is to make sure the columns of the expression matrix are in the same order as rows in the metadata
+>Obviously, if the "SraRunTable.txt" has already involved all the information, doing `meta <- read.csv("SraRunTable.txt", header=T)` would have been sufficient.
+>
+>The last line is to make sure the columns of the expression matrix are in the same order as rows in the metadata
 
 Optionally we also want to get some more information about the genes than just the GENCODE IDs. This can be done by searching at the Ensembl database using the `biomaRt` package.
 ```R
@@ -1208,5 +1212,248 @@ expr <- expr[meta_genes$ensembl_gene_id_version,]
 >* The `right_join` function is similar to the `inner_join` function above, both of which are tidyverse features. What makes `right_join` different is that it keeps all the entries of the data frame on the right hand side
 >* The `distinct` function subset the unique rows, optionally to focus on a subset of columns only. If `.keep_all` is set to TRUE, all columns are kept instead of only the focused ones.
 >* Similarly, the last line is to make sure the rows of the expression matrix are in the same order as rows in the gene metadata
+
+
+### 3-3 Comparison of transcriptomic profiles across samples
+<sub><a href="#top">(Back to top)</a></sub></br>
+Now we have the data to analyze imported to R. It is time to start the real analysis.
+
+Let's have a first look at the row and column numbers of the expression matrix
+```R
+dim(expr)
+```
+With the example data set, we see 61852 rows and 25 columns, meaning 61852 annotated genes and 25 samples. That's a large number of genes, but are they all actually informative? We can firstly check their average expression levels.
+
+```R
+avg_expr <- rowMeans(expr)
+
+layout(matrix(1:2, nrow=1))
+hist(avg_expr)
+hist(log10(avg_expr + 1))
+```
+
+>**NOTE**
+>If you use the RStudio server at bs-studentsvr04, you may encouter the following error message
+>```
+>Error in RStudioGD() : 
+>  Shadow graphics device error: r error 4 (Error in .External2(C_X11, paste0("png::", filename), g$width, g$height,  : 
+>  unable to start device PNG
+>)
+>```
+>In that case, try to run `options(bitmapType='cairo')`. It should then solve the problem.
+
+<p align="center"><img src="img/hist_avg_expr_base.png" /></p>
+
+>**NOTE**
+>* `rowMeans` calculates the mean per row of the given matrix and then return a vector with the same length as the row numbers. There are similar functions like `colMeans`, `rowSums`, `colSums`, which are easy to guess their functionalities
+>* `layout` specifies plot arrangement, but only application to the plotting functions in base R
+>* `hist` is the base R plotting function to create a histogram
+>* There are two types of plotting functions in base R. One of them create a new plot (e.g. `plot`, `hist`, `barplot`, `boxplot`) by default, the others add additional components onto the plot (e.g. `points`, `lines`, `rect`, `polygon`, `legend`, `text`, `mtext`). Each function has lots of adjustable parameters to control the plotting behaviors, e.g. whether to add axis labels, the shape/size of dots, the line width, etc. Note that once a component (e.g. an axis label) is added, it could not be reversed. Adding another component would just have it overlaid on top of the previous one. If you want to erase something, you would need to do the whole plotting again and make sure to not add the thing you don't want
+>* `log10` applies log10-transformation to each element of the given vector/matrix. Note that log10(0) returns -Inf. To avoid the negative values, it is very common to use pseudocount, i.e. add one to the values before doing the transformation, when log-transforming expression values. In that case, the original zeros remains zeros.
+
+The expression levels of genes follow a [long tail](https://en.wikipedia.org/wiki/Long_tail) distribution. It looks much better after log-transforming the expression levels. Indeed, the expression levels of different expressed genes **in one sample** has been long considered as approximately log-normal distributed (normal distributed after being log-transformed). However, that doesn't take into account the unexpressed genes, which account for most of the annotated genes here because
+1. Our samples are relatively similar (all brains) and therefore have a similar set of genes being expressed
+2. The standard RNA-seq technology measures mostly the PolII-transcribed mRNAs with poly-A tails, while our gene annotation contains also a large amount of other genes (e.g. rRNA, tRNA, microRNA, etc.)
+This makes the y-axis dominated by the very first bin which includes all the unexpressed genes. To make it more clear, we can try to also log-transform the y-axis. This is doable with the base R plotting functions, but it would be even more straightforward if we use `ggplot2`.
+
+```R
+library(ggplot2)
+
+ggplot(data.frame(avg_expr), aes(x=avg_expr)) +
+  geom_histogram(bins = 50) +
+  scale_x_continuous(breaks = c(0,1,10,100,1000,10000,20000), trans="log1p", expand=c(0,0)) +
+  scale_y_continuous(breaks = c(0,1), expand=c(0,0), trans="log1p") +
+  theme_minimal()
+```
+
+>**NOTE**
+>The way `ggplot2` does plotting is very different from base R. `ggplot2` is data-centric. We provide the data as a `data.frame` to the main function `ggplot` to create a ggplot object, and all the different plottings can be then applied to the same data, but each can consider different feature(s) of the data. Also, every step of the operation is to add/adjust components to the existed ggplot object (that's why it is `+` being used to connect those operations). Since the plotting doesn't happen at the very beginning, it is much easier to adjust. Nowadays, `ggplot2` is the mainstream plotting package in R. Not only that it has provided a lots of functions to do different types of plotting and adjustment, but also it provides a very flexible and powerful framework so that people can implement further extensions based on `ggplot2` but for other more complicated and specialized plottings (e.g. [`ggtranscript`](https://github.com/dzhang32/ggtranscript) to visualize transcript structure and annotation.
+>
+>To learn `ggplot2`, there are quite some great books and tutorials. One is already mentioned above, [R Graphics Cookbook](https://r-graphics.org/) by Winston Chang. There are also online course (e.g. the [Data Visualization & Dashboarding with R](https://www.coursera.org/specializations/jhu-data-visualization-dashboarding-with-r) Specialization specialization in coursera). Also more materials are available, such as the [ggplot2 cheatsheet](https://raw.githubusercontent.com/rstudio/cheatsheets/main/data-visualization.pdf) at rstudio.com.
+>
+>In this tutorial, both base R plotting and ggplot2 plotting will be used, depending on which is easier to do.
+
+<p align="center"><img src="img/hist_avg_expr_ggplot.png" /></p>
+
+In addition, we can check in how many samples each gene is detected.
+
+```R
+num_det <- rowSums(expr > 0)
+hist(num_det)
+```
+
+<p align="center"><img src="img/hist_num_det.png" /></p>
+
+From the above plots, we can easily see that many genes are either no detected at all in all or most of the samples, or only with very low expression even if they do express in quite some samples. They are probably not the genes we are interested in for those samples and the comparisons we are going to do later. Here we are going to use the threshold of 1) being detected in at least half of the samples, or 2) average TPM>=1, to define whether a gene is expressed or not.
+```R
+expressed <- rowMeans(expr > 0) >= 0.5 | rowMeans(expr) >= 1
+```
+
+It is then fine to exclude those considered as unexpressed or extremely lowly expressed, by completely remove those genes from the data:
+```R
+expr <- expr[which(expressed),]
+meta_genes <- meta_genes[which(expressed),]
+```
+
+or to add a column at the gene metadata information table to mark whether it is expressed, and make sure to exclude them from some analysis when needed:
+```R
+meta_genes$expressed <- expressed
+```
+
+Here let's continue with the second way.
+
+Next, we can compare all the samples in the dataset unbiasedly without considering the sample information. The commonly used method is to calculate pairwise correlation coefficients between samples. Note that there are different types of correlation coefficients, among which the Pearson's correlation coefficient (*r*, PCC) and Spearman's rank correlation coefficient (*ρ*, SCC) are the two most widely used ones. PCC measures the linear correlation between two sets of data, as the ratio between the covariance of two variables and the product of their standard deviations, and it is always between −1 (perfectly anti-correlated) and 1 (perfectly correlated). SCC, on the other hand, is a nonparametric measure of rank correlation to describe how well the relationship between two variables can be described using a monotonic function. Practically speaking, SCC is equivalent to PCC on the two variables after each being represented by the value ranks instead of the original values. PCC is a great and fast estimate of linear relationships when the variables are normal distributed, while SCC is non-parametric and therefore more robust to the data distribution. In R, both correlation coefficients can be calculated using the function `cor`:
+```R
+corr_pearson <- cor(log1p(expr[meta_genes$expressed,]))
+corr_spearman <- cor(expr[meta_genes$expressed,], method = "spearman")
+```
+
+>**NOTE**
+>* As mentioned above, the expression levels of genes in one sample is considered as log-normal. Therefore, PCC works better with log-transformation. `log1p` does pseudocount (+1) to avoid negative values (especially log(0)) before the transformation.
+>* Since SCC ranks values of two variables, and log-transformation doesn't change the ranks of values, log-transformation has no effect on SCC, and is therefore not needed.
+>* There are different ways of using the `cor` function. The most typical way is `cor(x,y)` where both `x` and `y` are vectors with the same length. It then returns a single value which is the correlation coefficient. The second way is the way in the above example script (`cor(X)` with `X` being a matrix). The function calculates correlation coefficients between every two columns, and then return a correlation matrix with both row and column numbers identical as the column number of `X`. The third way is `cor(X,Y)` with both `X` and `Y` being matrices. It requires the two matrices have the same number of columns which represent the same features (in the same order), then it calculates correlation coefficients between every column in `X` and every column in `Y`, returning a correlation matrix with rows representing samples (columns) in `X`, and columns representing samples (columns) in `Y`.
+
+Next, we can apply hierarchical clustering to the samples, given the correlation coefficients as similarities. Hierarchical clustering groups samples with smaller distances with each other first, followed by those two larger distances, and every time it groups only two samples, resulting in a tree as the output. Since it expects pairwise distances instead of similarities as the input, we use $1-r$ or $1-ρ$ as the input. Hierarchical clustering is implemented as the `hclust` function in R.
+```R
+hcl_pearson <- hclust(as.dist(1 - corr_pearson))
+hcl_spearman <- hclust(as.dist(1 - corr_spearman))
+
+layout(matrix(1:2,nrow=1))
+plot(hcl_pearson)
+plot(hcl_spearman)
+```
+
+<p align="center"><img src="img/hcl_expressed.png" /></p>
+
+We can easily see that the two trees based on PCC and SCC are very similar. Meanwhile, it is extremely hard to get useful information directly from the plots as samples are named by their SRR accessions without referring to any of their metadata information. We can therefore plot the metadata labels instead of the accessions on the tree. Here we focus on the tree based on SCC.
+```R
+layout(matrix(1:2,nrow=1))
+plot(hcl_spearman, labels = meta$Individual)
+plot(hcl_spearman, labels = meta$Layer)
+```
+
+<p align="center"><img src="img/hcl_expressed_meta.png" /></p>
+
+Another way to check similarities between samples is to use dimension reduction techniques. It is hard for a human-being to summarize information from tens of thousands of genes and make a good estimate how one sample is similar to another. However, if we can firstly summarize those many dimensions into a much smaller number, like two, then with human eye it would be also easy to judge how similar those samples are with each other. This is so-called dimension reduction, and there are many of them, some based on linear transformation of the data, while some are non-linear. Among them, [principal component analysis (PCA)](https://en.wikipedia.org/wiki/Principal_component_analysis) is definitely the most commonly used one when analyzing RNA-seq data, and probably also in many other researches.
+
+Here we skip most of the mathematics. In brief, PCA tries to identify the principal components (PCs) of the given data. Each PC is a linear combination of all the original features, and there are in total $n$ PCs of a given data, with $n$ as the smaller value between the number of features and number of samples. PCs are ordered, each defines a direction in the full dimension space of the data which maximizes the variations when the data point is projected to, while the direction should be orthogonal to all the previous PCs. Therefore, the 1st PC of the data explains the most variation of the data, while the 2nd one explains less but more than the others, while the 2nd PC and the 1st PC are orthogonal (kinds of independent) to each other; so on so forth.
+
+In R, PCA is implemented in the function `prcomp`.
+```R
+pca <- prcomp(log1p(t(expr[meta_genes$expressed,])), center = TRUE, scale. = TRUE)
+```
+
+>**NOTE**
+>* Different from the `cor` function, `prcomp` considers rows as samples and columns as features. Therefore, we need to transpose the expression matrix before providing it to the function.
+>* The `center` and `scale.` parameters in the `prcomp` function specify whether each variables should be shifted to be zero centered (minus the average across samples), and whether each variables should be scaled to have unit variance (divided by the standard deviation across samples). Different genes have different expression levels and variations, and setting these parameters to TRUE helps to equalize contributions of different genes
+>* In the example here we log-transformed the data. This is somehow optional. Similar to PCC, PCA also works better when the data is normally distributed, but what it really wants is per gene across samples being normal, rather than per sample across genes as the case for PCC above. The expression of one gene across multiple samples are usually considered as following negative binomial distribution, or approximately log-normal distribution. This means doing log-transformation should improve the result. On the other hand, the long-tail effect of per gene across samples distribution is usually much less than per sample across genes. From my experience, the PCA result is usually not changed fundamentally (but for sure changed) with or without the transformation.
+
+Now we can check how much variance that each PC explains.
+```R
+eigs <- pca$sdev^2
+plot(1:length(eigs), eigs)
+```
+
+<p align="center"><img src="img/pca_eigs.png" /></p>
+
+The first two PCs together already explain 43.1% of the data variance. It implies that visualizing the first two PCs (instead of thousands of genes) would have helped us to understand transcriptomic similarities between samples. So let's do that.
+```R
+ggplot(data.frame(pca$x, meta)) +
+  geom_point(aes(x = PC1, y = PC2, color = Layer, shape = Individual), size = 5)
+```
+
+<p align="center"><img src="img/pca_x.png" /></p>
+
+Here we use colors of dots to represent the layer information, and shapes of dots to represent the individual information, so that they can be shown together in one plot.
+
+#### Optional: highly variable genes identification
+The calculation of both the pairwise correlation coefficients and the PCA take times, which is proportional to the number of features in the data. We have already down-scaled the data by excluding the lowly expressed and unexpressed genes, but there is still space to further limit the genes to be used. This is really optional, but when you have many samples, you may want to minimize the number of features you have to take into account to just get a global view of the data. In this case, we can apply the highly variable gene identification step, to identify genes with significantly more variance than expected.
+
+There are quite many methods to identify highly variable genes, mostly developed recently for single-cell RNA-seq data with nowadays thousands or millions of cells measured individually. The gigantic number of cells (samples) makes the highly variable gene identification essential. The following is a function adapted from a lecture about [single-cell RNA-seq data analysis](http://pklab.med.harvard.edu/scw2014/subpop_tutorial.html) by Prof. Peter Kharchenko at Harvard Medical School during the Single Cell Workshop 2014.
+```R
+estimate_variability <- function(expr){
+  means <- apply(expr, 1, mean)
+  vars <- apply(expr, 1, var)
+  cv2 <- vars / means^2
+  
+  minMeanForFit <- unname(median(means[which(cv2 > 0.3)]))
+  useForFit <- means >= minMeanForFit
+  fit <- glm.fit(x = cbind(a0 = 1, a1tilde = 1/means[useForFit]),
+                 y = cv2[useForFit],
+                 family = Gamma(link = "identity"))
+  a0 <- unname(fit$coefficients["a0"])
+  a1 <- unname(fit$coefficients["a1tilde"])
+  
+  xg <- exp(seq(min(log(means[means>0])), max(log(means)), length.out=1000))
+  vfit <- a1/xg + a0
+  df <- ncol(expr) - 1
+  afit <- a1/means+a0
+  varFitRatio <- vars/(afit*means^2)
+  pval <- pchisq(varFitRatio*df,df=df,lower.tail=F)
+  
+  res <- data.frame(mean = means,
+                    var = vars,
+                    cv2 = cv2,
+                    useForFit = useForFit,
+                    pval = pval,
+                    padj = p.adjust(pval, method="BH"),
+                    row.names = rownames(expr))
+  return(res)
+}
+```
+
+Next we use this function to test for significance of [overdispersion](https://en.wikipedia.org/wiki/Overdispersion).
+```R
+var_genes <- estimate_variability(expr[meta_genes$expressed,])
+meta_genes$highvar <- meta_genes$ensembl_gene_id_version %in% rownames(var_genes)[which(var_genes$padj < 0.01)]
+```
+
+Then we can do the SCC-based hierarchical clustering and PCA again.
+```R
+corr_spearman_highvar <- cor(expr[meta_genes$highvar,], method = "spearman")
+hcl_spearman_highvar <- hclust(as.dist(1 - corr_spearman_highvar))
+layout(matrix(1:2,nrow=1))
+plot(hcl_spearman_highvar, labels = meta$Individual)
+plot(hcl_spearman_highvar, labels = meta$Layer)
+
+pca_highvar <- prcomp(log1p(t(expr[meta_genes$highvar,])), center = TRUE, scale. = TRUE)
+ggplot(data.frame(pca_highvar$x, meta)) +
+  geom_point(aes(x = PC1, y = PC2, color = Layer, shape = Individual), size = 5)
+```
+
+<p align="center">
+<img src="img/hcl_highvar_meta.png" />
+<img src="img/pca_x_highvar.png" />
+</p>
+
+Generally speaking, the transcriptomic similarity patterns don't change a lot even if we subset the genes to only the highly variable ones, which accounts for only ~6% of all the genes passing the expression thresholds.
+
+#### Optional: batch effect correction
+From the trees and the PCA plots, we can clearly feel that while samples representing the same layer kinds of stay closer with each other, there are also samples of different layers but the same individual grouped together. There are several possible explanations:
+1. There are individual variations due to ages, sexes, ethnicities, etc.
+2. There is technical batch effect, which is pretty common in RNA-seq data. As samples of the same individual have more similar experimental procedures (usually not the protocol itself, but experimental times, handling persons, sequencing runs and so on), they could then have smaller technical differences than samples from different individuals
+
+To deal with such issues, algorithms have been developed for batch effect correction. Among them, [ComBat](https://academic.oup.com/biostatistics/article-lookup/doi/10.1093/biostatistics/kxj037) is probably the most famous and commonly used one. It was originally developed for microarray data, assuming data following normal distribution. This is somehow applicable to RNA-seq data, assuming the RNA-seq quantification following log-normal distribution. More recently, [ComBat-seq](https://academic.oup.com/nargab/article/2/3/lqaa078/5909519) was developed to adapt the negative binomial distribution which better describes the nature of RNA-seq count data. Both methods are implemented in the package `sva` in R, as the functions `ComBat` and `ComBat_seq`.
+
+```R
+library(sva)
+expr_combat <- ComBat_seq(counts = expr,
+                          batch = meta$Individual)
+
+corr_spearman_combat <- cor(expr_combat[meta_genes$expressed,], method = "spearman")
+hcl_spearman_combat <- hclust(as.dist(1 - corr_spearman_combat))
+layout(matrix(1:2,nrow=1))
+plot(hcl_spearman_combat, labels = meta$Individual)
+plot(hcl_spearman_combat, labels = meta$Layer)
+
+pca_combat <- prcomp(log1p(t(expr_combat[meta_genes$expressed,])), center = TRUE, scale. = TRUE)
+ggplot(data.frame(pca_combat$x, meta)) +
+  geom_point(aes(x = PC1, y = PC2, color = Layer, shape = Individual), size = 5)
+```
+
+<p align="center">
+<img src="img/hcl_combat_meta.png" />
+<img src="img/pca_x_combat.png" />
+</p>
 
 <br/><style scoped> table { font-size: 0.8em; } </style>
