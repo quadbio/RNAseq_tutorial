@@ -18,6 +18,7 @@
     * [3-1 Introduction to R](#3-1-introduction-to-r)
     * [3-2 Import data to R](#3-2-import-data-to-r)
     * [3-3 Comparison of transcriptomic profiles across samples](#3-3-comparison-of-transcriptomic-profiles-across-samples)
+    * [3-4 Differential expression analysis](#3-4-differential-expression-analysis)
 
 ## Introduction
 <sub><a href="#top">(Back to top)</a></sub></br>
@@ -970,6 +971,13 @@ for id in `cat SRR_Acc_List.txt`; do
 done
 ```
 
+>**NOTE**
+>There are more professional ways to build pipelines. [Nextflow](https://www.nextflow.io/) is one of the most commonly used one, especially in bioinformatics, which enables scalable and reproducible scientific workflows using software containers. It has lots of great features, such as combining multiple programs sequentially and **in parallel**, using containers to ensure the reproducibility, better managing input/output dependencies and resources, enabling tasks retry and resume, organizing files in directories, etc. Those features can be implemented with Bash scripting or other programming languages as well, but using Nextflow or other pipeline builders can make it much easier. You would need some time to get into it as you need to learn another language (it is an extension of the Groovy programming language), and we won't talk about them in further details here. However, if you are interested, do try to build a nextflow pipeline by yourself!
+>
+>Some learning materials of Nextflow:
+> * [Official documentation of Nextflow](https://www.nextflow.io/docs/latest/index.html)
+> * [Official example of an RNA-seq pipeline with nextflow](https://www.nextflow.io/example4.html)
+
 #### 2-2-2 Read pseudomapping with kallisto and data quantification
 <sub><a href="#top">(Back to top)</a></sub></br>
 Doing read mapping or alignment to the reference genome and then based on the gene annotation to do gene expression quantification is the typical procedure to preprocess RNA-seq data, but not the only way. In some scenarios, it is not very pratical to use this typical procedure. Examples include the huge genome problem. The axolotl (*Ambystoma mexicanum*) is a paedomorphic salamander, and it is the master of regenerations. It can regenerate nearly every part of their body including [limbs](https://www.science.org/doi/10.1126/science.aaq0681) and [brains](https://www.science.org/doi/10.1126/science.abp9262), and therefore it is a great model to study regenerations. However, any genomic study on axolotl would encounter one problem, that its genome is huge (\~32 Gb) which is about five times as big as the human genome (\~6.3 Gb). When preprocessing its RNA-seq data, for instance, the huge genome would mean much higher demands on memory usage (>200 GB) and time, which makes it difficult to run even on some computing servers. 
@@ -1117,7 +1125,7 @@ Now you can create a new R script file by clicking the <img src="img/new_r_scrip
 #### Install required R packages
 In the following analysis of the RNA-seq data, we need several additional R packages which are not preinstalled together with R. The following script should be able to install them. In the R console (either at the terminal or the R console in the RStudio server), do
 ```R
-install.packages(c("tidyverse","BiocManager"))
+install.packages(c("tidyverse","BiocManager","pbapply"))
 BiocManager::install(c("biomaRt","sva","DESeq2","edgeR"))
 ```
 
@@ -1455,5 +1463,57 @@ ggplot(data.frame(pca_combat$x, meta)) +
 <img src="img/hcl_combat_meta.png" />
 <img src="img/pca_x_combat.png" />
 </p>
+
+We can see from the results, especially the hierarchical clustering trees, that ComBat clearly pushes samples of the same layer but different individuals together.
+
+While all seem to be good, it is also important to keep in mind that the batch effect correction step is optional and may not always provide good results. First of all, it applies manipulation to the data, and any manipulation may result in unexpected artifact. Second, not all the techniques and analysis are equally sensitive to batch effect. For instance, ComBat doesn't seem to change the PCA result as dramatic as it does to the hierarchical clustering. Third, when doing the other analysis (e.g. to identify differentially expressed genes (DEGs)), the batch information can be taken into account as a covariate in the model so that the batch effect can be dealt with together with other confounding variables without the prior batch effect correction.
+
+### 3-4 Differential expression analysis
+<sub><a href="#top">Back to top</a></sub><br/>
+From the previous analysis we can see that samples of different cortical layers have differenct transcriptomic profiles. To better understand what exactly those differences are, we can try to explicitly identify genes with different expression levels among different cortical layers. This is what we are going to do next: the differential expression (DE) analysis.
+
+DE analysis can be very simple. For instance, we can calculate the average expression of a gene in each condition, and then the fold change in one condition versus the others, and then consider those with the biggest changes as those with DE. This simple method may not be a super bad idea actually, but obviously it is definitely not a good one as it doesn't consider the critical factor: variations, i.e. the expression differences between different measurements. There are generally three types of variations:
+1. Technical variations, that due to the technical process of the measurement. For instance, if you do RNA-seq on the same sample for twice, you will nearly for sure get similar but not identify expression level estimates
+2. Individual variations, that regardless biological conditions, every sample or individual has some specific difference from the others just like there is no two identical humans even for twins
+3. Group variations, that represent the biological differences between conditions.
+
+What we are really interested in is the third one, but to estimate it correctly we also need to consider the other two. This is also the reason why we need multiple replicates of the each conditions; or the experiment would need to be designed in a way that samples from "different conditions" can be seen as "cross-replicates", for instance, a reasonale number of samples all with different time points to study transcriptomic changes across the time course, so that we see the time course as a continuous condition rather than each individual time point as one distinct condition.
+
+In any case, with multiple replicates, we can in some ways estimate the within-group variations, which accounts for the technical and indivudal variations altogether, and then estimate whether the between-group variations are significantly larger using some statistical tests. When the statistical test rejects the null hypothesis that samples of different conditions have no more difference than samples of the same condition, we find a pretty good candidate of gene with DE (of course, we would also want to double check the simple fold change).
+
+There are many statistical tests and methods we can use.
+
+#### ANOVA and ANCOVA
+The simplest methods that people used a lot are those famous group-to-group comparison test like t-test (which assumes normal distribution) and Wilcoxon's rank sum test (non-parametric without data distribution assumption, but less powerful). Those methods are simple and good, but have quite some limitations. They only allows comparisons between two groups, and they couldn't take into account additional factors that's different from the biological conditions of interest (e.g. the batch effect).
+
+The more flexible, but still simple way is to use linear ANOVA (analysis of variance) or ANCOVA (analysis of covariance), assuming normal distribution of the data. As mentioned above, the RNA-seq data can be approximated as log-normal distribution (or even normal distrbution although less appropriate), which makes this simple way possible, and in many cases, work pretty nicely.
+
+There are quite some differences betwen ANOVA and ANCOVA. For instance, ANOVA only contains categorical independent variables, while ANCOVA is like a hybrid of ANOVA and regression, so numeric independent variables are also possible. ANOVA doesn't consider covariates (characteristics excluding the actualy treatment, or the conditioning of interest), while ANCOVA does. Essentially, ANOVA is to estimate means of different groups, while ANCOVA is to exclude the effect of one or more metric-scaled undesirable variable from dependent variable. Meanwhile, to be practical ignoring those differences, both methods are implemented as the `aov` function for model fitting (essentially it is a wrapper of the `lm` function short for linear model, so we will use `lm` directly), and `anova` function for statistical testing in R. We can use to functions to fit two models, one is the full model with both the biological condition information (i.e. the cortical layer for the example data) and the covariates (in this example the individuals), while the other one is the null model with only the covariates.
+
+The following script is an example to use this strategy to test for the gene ENSG00000198963.11, or *RORB* if we use the official gene symbol.
+```R
+dat <- data.frame(y = log1p(as.numeric(expr["ENSG00000198963.11",])),
+                  meta)
+m1 <- lm(y ~ Layer + Individual, data = dat)
+m0 <- lm(y ~ Individual, data = dat)
+test <- anova(m1, m0)
+pval <- test$Pr[2]
+```
+
+The estimated p-value is $3.26 \times 10^{-6}$, suggesting that the expression level of this gene significantly change in different layers. This makes a lot of sense, given the fact that *RORB* is the commonly used marker gene of layer IV (L4), the internal granular layer.
+
+We can then apply the test to all the genes passing the expression threshold.
+```R
+library(pbapply)
+pvals <- pbapply(expr[meta_genes$expressed,], 1, function(e){
+  dat <- data.frame(y = log1p(e),
+                    meta)
+  m1 <- lm(y ~ Layer + Individual, data = dat)
+  m0 <- lm(y ~ Individual, data = dat)
+  test <- anova(m1, m0)
+  pval <- test$Pr[2]
+  return(unname(pval))
+})
+```
 
 <br/><style scoped> table { font-size: 0.8em; } </style>
