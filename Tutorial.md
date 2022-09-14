@@ -1,6 +1,6 @@
 # Tutorial for bulk RNA-seq data preprocessing and analysis
 #### Compiled by Zhisong He
-#### Updated on 12 Sept 2022
+#### Updated on 14 Sept 2022
 ### Table of Content
   * [Introduction](#introduction)
   * [Preparation](#preparation)
@@ -1100,7 +1100,8 @@ Here are some resources for learning R, that you can find online:
 * [An Introduction to R](https://cran.r-project.org/doc/manuals/r-release/R-intro.html), the official manual
 * [An Introduction to R](https://intro2r.com/), same name, but different content. It is an e-book by Alex Douglas, Deon Roos, Francesca Mancini, Ana Couto and David Lusseau who all have lots of experiences on using and teaching R
 * [R for Data Science](https://r4ds.had.co.nz/), about how to do data science in R, and includes quite some modern elements of R (e.g. tidyverse, pipe)
-* [R Graphics Cookbook](https://r-graphics.org/), about the graphics features of R, especially with ggplot2, the widely used visualization framework in R which was originally created by Hadley Wickham in 2005 to implement "The Grammar of Graphics".
+* [R Graphics Cookbook](https://r-graphics.org/), about the graphics features of R, especially with ggplot2, the widely used visualization framework in R which was originally created by Hadley Wickham in 2005 to implement "The Grammar of Graphics"
+* [Ten simple rules for teaching yourself R](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1010372), an article at the education section of PLOS Computational Biology
 
 In the bs-studentsvr04 server, R (4.2.1) has been installed and can be used directly. Indeed, during your installation of the tools with conda, your conda environment should also have an R installed, so there would be at least two different Rs you can use.
 
@@ -1125,7 +1126,7 @@ Now you can create a new R script file by clicking the <img src="img/new_r_scrip
 #### Install required R packages
 In the following analysis of the RNA-seq data, we need several additional R packages which are not preinstalled together with R. The following script should be able to install them. In the R console (either at the terminal or the R console in the RStudio server), do
 ```R
-install.packages(c("tidyverse","BiocManager","pbapply"))
+install.packages(c("tidyverse","ggrepel","BiocManager","pbapply"))
 BiocManager::install(c("biomaRt","sva","DESeq2","edgeR"))
 ```
 
@@ -1515,5 +1516,98 @@ pvals <- pbapply(expr[meta_genes$expressed,], 1, function(e){
   return(unname(pval))
 })
 ```
+
+>**NOTE**
+>The `pbapply` package provides functions like `pbapply`, `pbsapply`, `pblapply` and `pbtapply` which are very similar to their counterpart at Base R (`apply`, `sapply`, `lapply` and `tapply`). The difference is that the functions in the `pbapply` package provides a progress bar and estimate of remaining time ("pb" for progress bar). This could be very helpful when the function needs to loop through a large amount of data.
+
+Of course, we shouldn't directly take those estimated p-values. In statistics, there is the [multiple testing problem](https://en.wikipedia.org/wiki/Multiple_comparisons_problem). In a null-hypothesis test, the output p-value is the probability of getting a more extreme result than what is being observed, when the null hypothesis is correct. The p-value is very unlikely to be zero (even if you see p-value zero in R, it just means it is so close to zero that it is beyond the precision that the computer can distinguish it from zero), implying that there is still the possibility that the null hypothesis is correct and we get the observation simply because we are lucky. When we only have one test being done, we are pretty safe when we get a pretty small p-value (e.g. the most commonly used threshold 0.05, as well as 0.1 and 0.01, depending on how strict you want). Now, let's assume you have 100 similar comparisons to do, and now I tell you that for all of them the null hypothesis is correct (no difference between groups). In this case, the p-values of those 100 tests are expected to be uniformly distributed between 0 and 1, and we would expect to see about 5 tests getting a p-value < 0.05, but obviously, we don't want to falsely report those cases as of "significant" changes.
+
+Therefore, there are the multiple testing correction techniques to make statistical tests more stringent in order to counteract the problem of multiple testing. There are quite some different techniques. The best known such adjustment is the [Bonferroni correction](https://en.wikipedia.org/wiki/Bonferroni_correction), in practice by timing the resulted p-values by the number of tests (*n*), or 1 if p-value is larger than $ \frac{1}{n}$. It is the easiest adjustment, controling for family-wise error rate (relating to the null hypothesis being true for all comparisons simultaneously), but it is also a conservative one, especially when there is a large amount of tests being done. There are other alternative approaches, for instance, the [Benjamini–Hochberg (BH) correction](https://en.wikipedia.org/wiki/False_discovery_rate#Benjamini%E2%80%93Hochberg_procedure), or FDR (False Discovery Rate) correction, which estimates an FDR for each test based on the assumption of 0-1 uniform distribution of the p-values when the null hypothesis holds. In practice, it counts the number of test with p-values no larger than the observed p-value of a test (*k*), and then it estimates the expected number of tests with no-larger p-value as $p \times n$. The FDR is thus $ \frac{k}{p \times n}$. In R, both methods are implemented, together with others, as the function `p.adjust`. One would need to speficy the method if Bonferroni or BH correction is wanted. The default adjustment method is "holm" for the [Holm–Bonferroni method](https://en.wikipedia.org/wiki/Holm%E2%80%93Bonferroni_method), which is similar to the Bonferroni correction by less conservative. Instead of always using $p \times n$ as the corrected p-value, it uses $p \times r$ where *r* is the descending rank of the nominal p-value.
+
+```R
+padj <- p.adjust(pvals, method = "bonferroni")
+```
+
+Next, we can also calculate a fold change for each gene to represent its changing magnitude. Since we have multiple conditions (layers), we can use $\frac{max}{min}$ as the representation.
+```R
+fc <- pbapply(expr[meta_genes$expressed,], 1, function(e){
+  avg_layers <- tapply(log1p(e), meta$Layer, mean)
+  return(exp(max(avg_layers) - min(avg_layers)))
+})
+```
+
+We can also wrap up all the three parts into one function.
+```R
+DE_test <- function(expr,
+                    cond,
+                    covar = NULL,
+                    padj_method = p.adjust.methods){
+  pval_fc <- data.frame(t(pbapply(expr, 1, function(e){
+    dat <- data.frame(y = log1p(e),
+                      cond = cond)
+    if (! is.null(covar))
+      dat <- data.frame(dat, covar)
+    
+    m1 <- lm(y ~ ., data = dat)
+    m0 <- lm(y ~ . - cond, data = dat)
+    test <- anova(m1, m0)
+    pval <- test$Pr[2]
+    
+    avgs <- tapply(log1p(e), cond, mean)
+    fc <- exp(max(avgs) - min(avgs))
+    
+    return(c(pval = pval, fc = fc))
+  })), row.names = rownames(expr))
+  padj <- p.adjust(pval_fc$pval, method = padj_method)
+  return(data.frame(pval_fc, padj)[,c("pval","padj","fc")])
+}
+
+res_DE <- DE_test(expr = expr[meta_genes$expressed,],
+                  cond = meta$Layer,
+                  covar = meta %>% dplyr::select(Individual)) %>%
+  tibble::rownames_to_column("gene")
+```
+
+>**NOTE**
+> * `function` is used to define a new function so that a chunk of script can be reused easily
+> * `<package>::<function>` is the way to call a function which is contained in one package. Calling a function in this way can prevent the function name conflict when multiple packages containing different functions but with the same name are imported (otherwise you may actually call a wrong function)
+> * `dplyr::select` selects a subset of columns in the given data.frame
+> * `tibble::rownames_to_column` converts the row names of the data.frame into one of its column named by the given variable. The new column becomes the first column of the new data.frame
+
+A very common way of visualizing the DE analysis result to the volcano plot, in which we show the log-transformed fold change (logFC) as the x-axis, and the log-transformed p-value with sign reversed (-log(p)) as the y-axis, as the example below:
+<p align="center">
+<img src="img/volcanoplot_example.png" /><br />
+<sub>Image from <a href="https://training.galaxyproject.org/training-material/topics/transcriptomics/tutorials/rna-seq-viz-with-volcanoplot/tutorial.html">Galaxy Training!</a></sub>
+</p>
+
+We can also do a similar plot. However, different from the typical two-condition comparison where logFC has both positive and negative values, which results in a pretty bilateral symmetrical plot, our logFC only contains positive values.
+```R
+res_DE <- res_DE %>%
+  mutate(DE = padj < 0.1 & fc > 2) %>%
+  mutate(DEG = ifelse(DE, hgnc_symbol, NA))
+
+library(ggrepel)
+ggplot(res_DE, aes(x = log(fc), y = -log10(padj), col=DE, label=DEG)) +
+  geom_point() +
+  geom_text_repel() +
+  geom_vline(xintercept=c(log(2), 0), col="#303030", linetype="dotted") +
+  geom_hline(yintercept=-log10(0.1), col="#303030", linetype="dotted") +
+  scale_color_manual(values=c("#909090", "red")) +
+  theme_minimal()
+```
+
+>**NOTE**
+>The `ggrepel` provides the functions including `geom_text_repel` which is used here. It allows adding labels to the existed ggplot object while making sure that the added labels don't overlay with each other. As a compromise, some labels would not be able to print for lack of spaces
+
+<p align="center"><img src="img/volcano_ancova.png" /></p>
+
+#### DESeq2
+Now we have our own DE analysis developed! It is really not difficult and the results generally make sense.
+
+On the other hand, there are limitations. One major problem is the assumed normal distribution of the data. While log-normal distribution is an OK approximation of the RNA-seq data, it is not optimal. It has been long reported that negative binomial distribution is a much more decent and natural assumption of RNA-seq data. Sampling transcripts from the whole transcriptome pool of a sample can be seen as a [Bernoulli process](https://en.wikipedia.org/wiki/Bernoulli_process). As the transcrptome pool is so large, the number of reads per gene can be nicely described using a [Poisson distribution](https://en.wikipedia.org/wiki/Poisson_distribution). On the other hand, because of the technical and individual variations, different samples, even under the same biological conditions, has variations of their expression, causing the expected mean of the Poisson distribution being a random distribution rather than a fixed value. This introduces overdispension to the Poisson distribution where the distribution mean and variance are supposed to be identical. This can be then described using [negative binomial distribution](https://en.wikipedia.org/wiki/Negative_binomial_distribution), which generalizes Poisson distribution by allowing a larger or smaller variance than the distribution mean.
+
+There are already statistical methods for DE analysis taking into account the proper description of the RNA-seq counts. Those include [DESeq2](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-014-0550-8) and [edgeR](https://academic.oup.com/bioinformatics/article/26/1/139/182458), the two most commonly used algorithm for DE analysis of RNA-seq data. As you can imagine, the two methods are quite similar conceptually, and indeed provide similar results as well. They differ from each other in terms of their normalization methods (which we won't use here as we have TPM data), as well as their ways of modeling the dispersion. Here we are not going into details, and if people are interested you can check the technical details in the papers, as well as studies comparing different DE methods (for instance, [this one](https://academic.oup.com/bib/article/16/1/59/240754)).
+
+Both [DESeq2](https://bioconductor.org/packages/release/bioc/html/DESeq2.html) and [edgeR](https://bioconductor.org/packages/release/bioc/html/edgeR.html) are implemented as R packages in Bioconductor. Here, let's go through the steps of DESeq2 on our example data set.
 
 <br/><style scoped> table { font-size: 0.8em; } </style>
