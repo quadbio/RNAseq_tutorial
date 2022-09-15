@@ -1778,9 +1778,10 @@ heatmap.2(corr_DEG, Rowv = as.dendrogram(hcl_DEG), Colv = as.dendrogram(hcl_DEG)
 > * Scientific journal color palettes (`ggsci` package)
 > * Wes Anderson color palettes (`wesanderson` package)
 > * R base color palettes: `rainbow`, `heat.colors`, `cm.colors`.
-><p align="center"><img src="img/r-color-palettes-r-color-scales.png" /></p>
+><p align="center"><img src="img/r-color-palettes-r-color-scales.png" /><br/><sub><i>Image from <a href="https://www.datanovia.com/en/blog/top-r-color-palettes-to-know-for-great-data-visualization/">here</a></i></sub></p>
+>
 >There are also websites where you can get great colors so that you can make your customized color palette. For example,
-> * https://htmlcolorcodes.com/
-> * https://colorbrewer2.org/
+> * [HTML Color Codes](https://htmlcolorcodes.com/)
+> * [ColorBrewer2](https://colorbrewer2.org/)
 
 <br/><style scoped> table { font-size: 0.8em; } </style>
