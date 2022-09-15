@@ -1,6 +1,6 @@
 # Tutorial for bulk RNA-seq data preprocessing and analysis
 #### Compiled by Zhisong He
-#### Updated on 14 Sept 2022
+#### Updated on 15 Sept 2022
 ### Table of Content
   * [Introduction](#introduction)
   * [Preparation](#preparation)
@@ -19,6 +19,9 @@
     * [3-2 Import data to R](#3-2-import-data-to-r)
     * [3-3 Comparison of transcriptomic profiles across samples](#3-3-comparison-of-transcriptomic-profiles-across-samples)
     * [3-4 Differential expression analysis](#3-4-differential-expression-analysis)
+	  * [ANOVA and ANCOVA](#anova-and-ancova)
+	  * [DESeq2](#deseq2)
+	* [3-5 Grouping of the identified DEGs](#3-5-grouping-of-the-identified-degs)
 
 ## Introduction
 <sub><a href="#top">(Back to top)</a></sub></br>
@@ -1126,7 +1129,7 @@ Now you can create a new R script file by clicking the <img src="img/new_r_scrip
 #### Install required R packages
 In the following analysis of the RNA-seq data, we need several additional R packages which are not preinstalled together with R. The following script should be able to install them. In the R console (either at the terminal or the R console in the RStudio server), do
 ```R
-install.packages(c("tidyverse","ggrepel","BiocManager","pbapply"))
+install.packages(c("tidyverse","ggrepel","BiocManager","pbapply","gplots"))
 BiocManager::install(c("biomaRt","sva","DESeq2","edgeR"))
 ```
 
@@ -1540,6 +1543,7 @@ We can also wrap up all the three parts into one function.
 ```R
 DE_test <- function(expr,
                     cond,
+					ctrl = NULL,
                     covar = NULL,
                     padj_method = p.adjust.methods){
   pval_fc <- data.frame(t(pbapply(expr, 1, function(e){
@@ -1554,7 +1558,11 @@ DE_test <- function(expr,
     pval <- test$Pr[2]
     
     avgs <- tapply(log1p(e), cond, mean)
-    fc <- exp(max(avgs) - min(avgs))
+	if (! is.null(ctrl) && sum(cond %in% ctrl) > 0){
+	  fc <- exp(max(avgs) - avgs[ctrl])
+	} else{
+      fc <- exp(max(avgs) - min(avgs))
+	}
     
     return(c(pval = pval, fc = fc))
   })), row.names = rownames(expr))
@@ -1608,6 +1616,171 @@ On the other hand, there are limitations. One major problem is the assumed norma
 
 There are already statistical methods for DE analysis taking into account the proper description of the RNA-seq counts. Those include [DESeq2](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-014-0550-8) and [edgeR](https://academic.oup.com/bioinformatics/article/26/1/139/182458), the two most commonly used algorithm for DE analysis of RNA-seq data. As you can imagine, the two methods are quite similar conceptually, and indeed provide similar results as well. They differ from each other in terms of their normalization methods (which we won't use here as we have TPM data), as well as their ways of modeling the dispersion. Here we are not going into details, and if people are interested you can check the technical details in the papers, as well as studies comparing different DE methods (for instance, [this one](https://academic.oup.com/bib/article/16/1/59/240754)).
 
-Both [DESeq2](https://bioconductor.org/packages/release/bioc/html/DESeq2.html) and [edgeR](https://bioconductor.org/packages/release/bioc/html/edgeR.html) are implemented as R packages in Bioconductor. Here, let's go through the steps of DESeq2 on our example data set.
+Both [DESeq2](https://bioconductor.org/packages/release/bioc/html/DESeq2.html) and [edgeR](https://bioconductor.org/packages/release/bioc/html/edgeR.html) are implemented as R packages in Bioconductor. Here, let's go through the steps of DESeq2 on our example data set. It starts by creating a `DESeqDataSet` object from the expression and metadata matrices. One problem though, that DESeq2 doesn't support using non-integer matrix to create the object, as it expects the raw count matrix without normalization (DESeq2 wants to do normalization by itself). Therefore, our `expr` matrix cannot be used to create the `DESeqDataSet` object. The similar issue also applies to edgeR.
+
+We have then two options. One is to go back to the quantification step, and let STAR output the raw count information instead of the transcriptome-mapping BAM file (just to recap, the `--quantMode GeneCounts` option). Alternatively, if we still want to use the RSEM transcript quantification result, we need to use another package `tximport` to import the transcript-level abundance and summarize into gene-level (yes, again), and then `DESeq2` provides the interface to use the `tximport` output to create the `DESeqDataSet` object. Also during the import by `tximport`, it also expects another table `txgene`, a two-column data.frame for the correspondence between transcript IDs and gene IDs. We can get that with `biomaRt`, similar to what we did above.
+```R
+library(biomaRt)
+ensembl <- useEnsembl(biomart = "ensembl",
+                      dataset = "hsapiens_gene_ensembl")
+tx2gene <- getBM(attributes = c("ensembl_transcript_id_version",
+                                "ensembl_gene_id_version"),
+                 filters = "ensembl_gene_id_version",
+                 values = rownames(expr),
+                 mart = ensembl) %>%
+  dplyr::select(ensembl_transcript_id_version, ensembl_gene_id_version)
+
+library(tximport)
+samples <-  list.files("rsem")
+files <- file.path("rsem", samples, paste0(samples,".isoforms.results"))
+txi <- tximport(files, type = "rsem", tx2gene = tx2gene)
+
+library(DESeq2)
+dds <- DESeqDataSetFromTximport(txi,
+                                colData = meta,
+                                design = ~ Layer + Individual)
+```
+
+Next, we apply expression threshold filtering to the object by subsetting only those we consider as expressed above. Then we can run DE analysis on the `DESeqDataSet` object using the `DESeq2` algorithm, in just one command.
+```R
+dds_filtered <- dds[intersect(rownames(expr)[meta_genes$expressed], rownames(dds)),]
+dds_filtered <- DESeq(dds_filtered, test="LRT", reduced= ~ Individual)
+res_DESeq2 <- results(dds_filtered)
+```
+
+>**NOTE**
+>The `DESeq` function is a wrapper of multiple functions that does three things:
+> 1. Estimation of size factors: `estimateSizeFactors`
+> 2. Estimation of dispersion: `estimateDispersions`
+> 3. Negative Binomial GLM fitting, and Wald statistics or likelihood ratio test depending on the parameters: `nbinomWaldTest` and `nbinomLRT`
+>
+>The `results` function then return the DE analysis results done by the `DESeq` function and stored in the `DESeqDataSet` object.
+
+`res_DESeq2`, which stores the output of the `results` function, is a data.frame containing informative columns such as `pval` and `padj`. Do keep in mind though, that the `baseMean` and `log2FoldChange` columns are not really informative in our case here, as they are more for the two-condition comparison. `DESeq2` takes the first condition (usually in alphabetical order, and when multiple variables are in the design formula when creating the `DESeqDataSet` object, the first one in the its colData is considered as the condition here by default) as the base condition (in the example here, DS1_H1), and without any specification, the `log2FoldChange` is the comparison between the first and second conditions (in this example, DS1_H1 vs. DS1_H4). This is obviously not what we want. On the other hand, they are informative when it is a two-condition comparison; or also partially helpful when it is a multiple-to-one comparison (e.g. different treatments versus control, though you do need to make sure that you set up the reference condition correctly).
+
+We can now compare the p-values we got from `DESeq2` and the p-values from our previous self-made DE analysis
+```R
+cor(res_DESeq2$padj,
+    res_DE %>% filter(gene %in% rownames(res_DESeq2)) %>% pull(padj),
+    method="spearman", use="complete.obs")
+
+layout(matrix(1:2, nrow=1))
+plot(-log10(res_DESeq2$pvalue),
+     -log10(res_DE %>% filter(gene %in% rownames(res_DESeq2)) %>% pull(pval)),
+     xlab = "-log10(pval DESeq2)", ylab = "-log10(pval DE)", pch=16)
+smoothScatter(-log10(res_DESeq2$pvalue),
+              -log10(res_DE %>% filter(gene %in% rownames(res_DESeq2)) %>% pull(pval)),
+              xlab = "-log10(pval DESeq2)", ylab = "-log10(pval DE)", pch=16)
+```
+
+>**NOTE**
+>While the `plot` function creates scatter plot by default, the `smoothScatter` function, given the same input, creates a scatter plot with smoothed densities color representation. The latter makes it easier to assess the data distribution when there are too many dots overlaying with each other.
+
+<p align="center"><img src="img/scatter_ancova_DESeq2.png" /></p>
+
+The SCC between the two DE analysis is very high (0.86), suggesting that they provide similar estimate of how strong a gene changes its expression in different layers in relative to other genes. Also from the scatter plot showing the -log-transformed p-values it is very clear that the two methods are pretty consistent with each other. Meanwhile, we can also easily see that DESeq2 is much more sensitive in detecting potential differences, given the much smaller p-values (large -log10(p)) it output. Indeed, when we check the number of identified DEGs with the two methods using the same criteria (Bonferroni-corrected p < 0.1), we get a lot more DEGs with the DESeq2 results.
+```R
+table(p.adjust(res_DESeq2$pvalue, method="bonferroni") < 0.1,
+      res_DE %>% filter(gene %in% rownames(res_DESeq2)) %>% pull(padj) < 0.1)
+```
+<pre><code>
+        FALSE  TRUE
+  FALSE 16780    43
+  TRUE   4937  1227
+</code></pre>
+
+The `table` function gives a frequency matrix of each combination given the two vectors. Rows are values of the first vector, and Columns are values of the second one. As we can see, basically all DEGs in our self-made test (column TRUE) are also DEGs in DESeq2 result (row TRUE); meanwhile, there are lots of DEGs in DESeq2 which don't pass the p-value threshold in the self-made test.
+
+### 3-5 Grouping of the identified DEGs
+Now we have a list of DEGs which represent the transcriptomic differences of different layers. Next we should try to better understand from those genes what kinds of biological indications they have. However, there is one more question we still need to figure out the answer: do you think those DEGs should be considered as a whole and representing one or a group of biological processes that correlate with each other? In most of the time, we have an easy answer, no. Obviously, it is very very likely that we have different groups of DEGs which have very different behaviors, in terms of their expression changes across samples. Even for the simplest case-control comparison, there would be likely a group of up-regulated genes and a group of down-regulated genes, and they usually represent different biological processes although they might coordinate with each other. Therefore, before further investigating the biological implications of those DEGs, we would try to group them based on their expression profiles or expression level changes.
+
+#### For case-control comparison
+We can simply split them into up-regulated and down-regulated, based on their average expression levels in the two conditions.
+
+#### For multi-condition comparisons (like the example here)
+We can choose to group them based on at which condition (layer) that they show the highest average expression level, for instance. Here we use the DEGs from our self-made test as the example
+```R
+DEG <- res_DE$gene[res_DE$DE]
+avg_expr <- sapply(sort(unique(meta$Layer)), function(layer) rowMeans(expr[,which(meta$Layer == layer)]))
+max_layer_DEG <- setNames(colnames(avg_expr)[apply(avg_expr[DEG,], 1, which.max)], DEG)
+```
+
+Now we can check the numbers of each group, and how the expression profiles across layers look for each group.
+```R
+table(max_layer_DEG)
+
+avg_expr_DEG_list <- tapply(names(max_layer_DEG), max_layer_DEG, function(x) avg_expr[x,])
+scaled_expr_DEG_list <- lapply(avg_expr_DEG_list, function(x) t(scale(t(x))))
+
+layout(matrix(1:8, nrow = 2, byrow = T))
+par(mar=c(3,3,3,3))
+for(layer in names(scaled_expr_DEG_list))
+  boxplot(scaled_expr_DEG_list[[layer]],
+          main = paste0(layer, " (", nrow(scaled_expr_DEG_list[[layer]]), ")"))
+```
+```
+max_layer_DEG
+ L1  L2  L3  L4  L5  L6  WM 
+193  69 166 110  46   7 622
+```
+<p align="center"><img src="img/boxplot_DEG_maxlayer.png" /></p>
+
+#### The most universal approach: clustering
+[Clustering](https://en.wikipedia.org/wiki/Cluster_analysis) is the task of grouping a set of objects in such a way that objects in the same group (called a cluster) are more similar (in some sense) to each other than to those in other groups (clusters). It is one of the three broad types of machine learning algorithms (the other two are classification and regression).
+
+There are many different algorithms aiming to solve the clustering task. Among them, there are two algorithms which are simple but powerful, and widely used in lots of different fields including RNA-seq data analysis. They are hierarchical clustering and k-mean clustering. In R, they are implemented as the functions `hclust` for hierarchical clustering and `kmeans` for k-mean clustering.
+
+The principle of hierarchical clustering is that objects being more related to nearby objects than to objects farther away. Therefore, it connects objects to form clusters based on their distance. In hierarchical clustering, clusters are stepwise formed with initially every object as one distinct cluster. When the distance threshold is relaxed to certain degree so that two clusters are no longer considered to be distinct, they are merged. Obviously, such procedure can be represented as a dendrogram (or a tree-like structure), and this is exactly why it is called hierarchical clustering. To be precise, hierarchical clustering is a series of algorithms sharing that same principle but with technical differences.
+
+In a hierarchical clustering algorithm, there are two critical components that largely determine the behavior of the algorithm. To some degree, by changing one of them, you get a different hierarchical clustering algorithm. One component is the distance function, or how "distance" between two objects is defined. The most commonly used distance function is [Euclidean distance](https://en.wikipedia.org/wiki/Euclidean_distance), but there are also other options, such as [Manhattan distance](https://en.wikipedia.org/wiki/Manhattan_distance) and the generalized [Minkowski distance](https://en.wikipedia.org/wiki/Minkowski_distance). Distance can be also defined as the reverse of similarities, so that the commonly used similarity metrics such as [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity) or the correlation coefficients we used above can all be used to define the distance function. Indeed, to use pairwise correlation coefficients between genes across samples as sample similarities ($s$), and then use ($1-s$) as the distance between two genes is one of the most commonly used way to define distance function for hierarchical clustering of genes.
+
+The second critical component of a hierarchical clustering algorithm is the linkage criteria. It defines the distance between two sets of objects, given the pairwise distances between all the objects. There are several commonly used linkage criteria, such as complete-linkage (as the longest distance between any pair of the two sets) and single-linkage (as the shortest distance between any pair of the two sets). The `hclust` function in R uses the complete linkage by default, but one can choose from different options using the `method` parameter.
+
+Here, we try to do hierarchical clustering on the DEGs identified with our self-made test, using the pairwise Spearman correlation distance across the average expression levels of layers as the distance function and the default complete linkage criteria.
+```R
+avg_expr <- sapply(sort(unique(meta$Layer)), function(layer) rowMeans(expr[,which(meta$Layer == layer)]))
+corr_DEG <- cor(avg_expr[res_DE$gene[res_DE$DE],], method = "spearman")
+hcl_DEG <- hclust(as.dist(1 - corr_DEG), method = "complete")
+plot(hcl_DEG, labels = FALSE)
+```
+>**NOTE**
+> * `hclust` expects a `dist` object, which is a specialized format for distance matrix. Such a distance matrix can be generated by the `dist` function that by default calculates pairwise Euclidean distances between **rows** of the data matrix but can also calculate other distance by specifying the `method` parameter. Alternatively, one can use the `as.dist` function to convert a normal matrix into a `dist` object. Here, we firstly calculate pairwise SCCs, and then convert the 1-SCC matrix into a distance matrix as the input of `hclust`
+> * It is fully fine to calculate similarities/distances between genes by comparing across samples instead of the average per condition (layer here). I did it here just to hope it reduce the effect of technical and individual variations (batch effect)
+> * By default, applying the `plot` function to the `hclust` output (a `hclust` object) shows also the labels of objects (here it would be the gene IDs). However, as there are so many DEGs here in the tree, showing them would be just a mess. Therefore, here the `labels` parameter is specified as FALSE to not to display the labels.
+
+<p align="center"><img src="img/hcl_DEG.png" /></p>
+
+Practically speaking, clusters can now be easily obtained by defining a cutting location at the y-axis of the tree. However, right then we encounter one major difficulty when doing hierarchical clustering: at which location shall we cut, or how many clusters we can actually need? There is usually no easy answer. There are algorithms that try to do it objectively and fully data-driven. For instance, one can cut at the place with the largest gap between two nearby branching points. On the other hand, clustering is just a way of grouping genes with similar behavior together, and there is in any case no good answer, or probably no such a uniquely correct answer, that how many real groups exist. Therefore, I personally don't think one has to do the cut in a fully objective manner. You can explore a little bit, to try several numbers of clusters and check their behaviors, then pick the one you like the best. It is also possible to do it more flexibly, like firstly choosing a larger number of clusters, and then merging some of them when there a valid reason.
+
+To assist making decision, one can visualize the correlation/distance matrix, with rows and columns ordered by the dendrogram from the hierarchical clustering.
+```R
+library(gplots)
+
+heatmap.2(corr_DEG, Rowv = as.dendrogram(hcl_DEG), Colv = as.dendrogram(hcl_DEG),
+          trace = "none", scale = "none", labRow = NA, labCol = NA)
+```
+<p align="center"><img src="img/heatmap_DEG_default.png" /></p>
+
+The default color is not very great to see difference between the large values. Let's try a different color palette.
+```R
+install.packages("viridis")
+library(viridis)
+heatmap.2(corr_DEG, Rowv = as.dendrogram(hcl_DEG), Colv = as.dendrogram(hcl_DEG),
+          trace = "none", scale = "none", labRow = NA, labCol = NA, col = viridis)
+```
+<p align="center"><img src="img/heatmap_DEG_viridis.png" /></p>
+
+>**NOTE**
+>When doing data visualization, you get half the success once you get the color palette right. In R, there are predefined color palettes available, and also quite some packages providing different color palettes which are great (usually nicer than the once in base R). For example,
+> * Viridis color scales (`viridis` package).
+> * Colorbrewer palettes (`RColorBrewer` package
+> * Grey color palettes (`ggplot2` package)
+> * Scientific journal color palettes (`ggsci` package)
+> * Wes Anderson color palettes (`wesanderson` package)
+> * R base color palettes: `rainbow`, `heat.colors`, `cm.colors`.
+><p align="center"><img src="img/r-color-palettes-r-color-scales.png" /></p>
+>There are also websites where you can get great colors so that you can make your customized color palette. For example,
+> * https://htmlcolorcodes.com/
+> * https://colorbrewer2.org/
 
 <br/><style scoped> table { font-size: 0.8em; } </style>
