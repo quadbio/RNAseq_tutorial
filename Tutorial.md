@@ -1785,4 +1785,27 @@ heatmap.2(corr_DEG, Rowv = as.dendrogram(hcl_DEG), Colv = as.dendrogram(hcl_DEG)
 > * [HTML Color Codes](https://htmlcolorcodes.com/)
 > * [ColorBrewer2](https://colorbrewer2.org/)
 
+Now let's cut the dendrogram to obtain 15 clusters of DEGs. We can visualize the clustering results on the heatmap as an additional side bar
+```R
+cl_DEG <- cutree(hcl_DEG, k = 15)
+heatmap.2(corr_DEG, Rowv = as.dendrogram(hcl_DEG), Colv = as.dendrogram(hcl_DEG),
+          trace = "none", scale = "none", labRow = NA, labCol = NA, col = viridis,
+          ColSideColors = rainbow(15)[cl_DEG])
+```
+<p align="center"><img src="img/heatmap_DEG_clustered_viridis.png" /></p>
+
+We can now check the average expression patterns of those clusters across different layers
+```R
+avg_expr <- sapply(sort(unique(meta$Layer)), function(layer) rowMeans(expr[,which(meta$Layer == layer)]))
+avg_expr_DEG_list <- tapply(names(cl_DEG), cl_DEG, function(x) avg_expr[x,])
+scaled_expr_DEG_list <- lapply(avg_expr_DEG_list, function(x) t(scale(t(x))))
+
+layout(matrix(1:15, nrow = 3, byrow = T))
+par(mar=c(3,3,3,3))
+for(layer in names(scaled_expr_DEG_list))
+  boxplot(scaled_expr_DEG_list[[layer]],
+          main = paste0(layer, " (", nrow(scaled_expr_DEG_list[[layer]]), ")"))
+```
+<p align="center"><img src="img/boxplot_DEG_hcl.png" /></p>
+
 <br/><style scoped> table { font-size: 0.8em; } </style>
