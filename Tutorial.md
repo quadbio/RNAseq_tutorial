@@ -1,6 +1,6 @@
 # Tutorial for bulk RNA-seq data preprocessing and analysis
 #### Compiled by Zhisong He
-#### Updated on 15 Sept 2022
+#### Updated on 16 Sept 2022
 ### Table of Content
   * [Introduction](#introduction)
   * [Preparation](#preparation)
@@ -21,7 +21,10 @@
     * [3-4 Differential expression analysis](#3-4-differential-expression-analysis)
 	  * [ANOVA and ANCOVA](#anova-and-ancova)
 	  * [DESeq2](#deseq2)
-	* [3-5 Grouping of the identified DEGs](#3-5-grouping-of-the-identified-degs)
+    * [3-5 Grouping of the identified DEGs](#3-5-grouping-of-the-identified-degs)
+    * [3-6 Interpretation and annotation of gene sets](#3-6-interpretation-and-annotation-of-gene-sets)
+    * [3-7 Other analysis](#3-7-other-analysis)
+
 
 ## Introduction
 <sub><a href="#top">(Back to top)</a></sub></br>
@@ -1729,7 +1732,9 @@ max_layer_DEG
 #### The most universal approach: clustering
 [Clustering](https://en.wikipedia.org/wiki/Cluster_analysis) is the task of grouping a set of objects in such a way that objects in the same group (called a cluster) are more similar (in some sense) to each other than to those in other groups (clusters). It is one of the three broad types of machine learning algorithms (the other two are classification and regression).
 
-There are many different algorithms aiming to solve the clustering task. Among them, there are two algorithms which are simple but powerful, and widely used in lots of different fields including RNA-seq data analysis. They are hierarchical clustering and k-mean clustering. In R, they are implemented as the functions `hclust` for hierarchical clustering and `kmeans` for k-mean clustering. 
+There are many different algorithms aiming to solve the clustering task. Among them, there are two algorithms which are simple but powerful, and widely used in lots of different fields including RNA-seq data analysis. They are hierarchical clustering and k-mean clustering. In R, they are implemented as the functions `hclust` for hierarchical clustering and `kmeans` for k-mean clustering.
+
+In the following we will focus on hierarchical clustering for its higher flexibility on cluster numbers and the fact that it is a deterministic approach. K-mean clustering, on the other hand, needs to specify the number of clusters before hand. In addition, the algorithm is done via iteractions of cluster centroid refinement until convergence, and this process is not deterministic but affected by the initial locations of the cluster centroids which is randomly placed. Therefore, the result of k-mean clustering is not as stable: applying it to the same data set for multiple times would likely result in similar but slightly different results. Still, k-means clustering is normally less computationally intensive, and therefore is more suitable than hierarchical clustering when the data set is very large. If you find hierarchical clustering being too slow for your data, you shall then try k-mean clustering or other grouping methods.
 
 The principle of hierarchical clustering is that objects being more related to nearby objects than to objects farther away. Therefore, it connects objects to form clusters based on their distance. In hierarchical clustering, clusters are stepwise formed with initially every object as one distinct cluster. When the distance threshold is relaxed to certain degree so that two clusters are no longer considered to be distinct, they are merged. Obviously, such procedure can be represented as a dendrogram (or a tree-like structure), and this is exactly why it is called hierarchical clustering. To be precise, hierarchical clustering is a series of algorithms sharing that same principle but with technical differences.
 
@@ -1825,5 +1830,24 @@ for(layer in unique(cl_DEG[hcl_DEG$order]))
 &nbsp; &nbsp;
   <img src="img/boxplot_DEG_hcl_reordered.png" style="width:65%">
 </p>
+
+One can then directly go with those clusters, or merge some of them with similar expression patterns, or drop those with only small number of genes. Those are all acceptable approaches.
+
+#### Co-expression network and co-expression modules/communities
+Besides the clustering methods introduced above, another type of algorithms for grouping genes are the network-based module identification algorithms. The principle is to firstly build a gene network, where each node is a gene, and an edge between two genes indicates the co-expression of them (e.g. the expression levels of the two genes are highly correlated across samples).
+
+There are different ways of building such a co-expression network. For example, one can calculate pairwise correlation coefficients of genes, and then set a hard threshold of correlation coefficient to determine whether the similarity between two genes is high enough to have an edge. There is also the k-nearest neighbor graph. For each gene, calculate the similarities (e.g. correlation coefficients) with all the other genes, the first k genes with the highest similarities with the gene, regardless how similar they are, are considered as the neighbors, and are thus connected by an edge.
+
+Both of these two methods result in an unweighted co-expression network, i.e. the two genes are either fully connected or unconnected. There are also ways to reconstruct a weighted co-expression network. [WGCNA (weighted gene co-expression network analysis)](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-9-559) is one of the most famous method to construct weighted co-expression network given [microarray](https://en.wikipedia.org/wiki/Microarray) or RNA-seq data. In WGCNA, edges are available between every two genes, but each has a different weight which related to the correlation between the two genes: $a_{ij}=s_{ij}^\beta$, and $s_{ij}=|cor(x_{i},x_{j})|$ or $s_{ij}=cor(x_{i},x_{j})$ depending on the setting. Here $\beta$ is equal to or larger than 1 to speed up the decay of the edge weight to achieve the approximate [scale-free topology criterion](https://en.wikipedia.org/wiki/Scale-free_network).
+
+Once a network, or a gene co-expression network to be more precise, is defined, the module identification or community finding algorithms in the graph theory field can be applied to identify the [modules/communities](https://en.wikipedia.org/wiki/Community_structure) in the network. Those algorithms include the popular [Louvain algorithm](https://en.wikipedia.org/wiki/Louvain_method), [Leiden algorithm](https://www.nature.com/articles/s41598-019-41695-z), [Walktrap algorithm](https://arxiv.org/abs/physics/0512106) and many other algorithms. In WGCNA, it is a hierarchical clustering based module identification algorithm being used, in which instead of using the correlation distance function we used above, to use [topological overlap measure (TOM)](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-8-22) which summarizes connectivities between genes as well as their neighbor sharing.
+
+Here we are not going to show the details of those methods. If you are interested in using those methods, you can start with WGCNA, which is implemented as an R package (`WGCNA`) in Bioconductor (install with `BiocManager::install("WGCNA")`). You can follow the WGCNA tutorial [here](https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/Tutorials/).
+
+### 3-6 Interpretation and annotation of gene sets
+<sub><a href="#top">(Back to top)</a></sub></br>
+
+### 3-7 Other analysis
+<sub><a href="#top">(Back to top)</a></sub></br>
 
 <br/><style scoped> table { font-size: 0.8em; } </style>
