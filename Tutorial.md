@@ -1729,7 +1729,7 @@ max_layer_DEG
 #### The most universal approach: clustering
 [Clustering](https://en.wikipedia.org/wiki/Cluster_analysis) is the task of grouping a set of objects in such a way that objects in the same group (called a cluster) are more similar (in some sense) to each other than to those in other groups (clusters). It is one of the three broad types of machine learning algorithms (the other two are classification and regression).
 
-There are many different algorithms aiming to solve the clustering task. Among them, there are two algorithms which are simple but powerful, and widely used in lots of different fields including RNA-seq data analysis. They are hierarchical clustering and k-mean clustering. In R, they are implemented as the functions `hclust` for hierarchical clustering and `kmeans` for k-mean clustering.
+There are many different algorithms aiming to solve the clustering task. Among them, there are two algorithms which are simple but powerful, and widely used in lots of different fields including RNA-seq data analysis. They are hierarchical clustering and k-mean clustering. In R, they are implemented as the functions `hclust` for hierarchical clustering and `kmeans` for k-mean clustering. 
 
 The principle of hierarchical clustering is that objects being more related to nearby objects than to objects farther away. Therefore, it connects objects to form clusters based on their distance. In hierarchical clustering, clusters are stepwise formed with initially every object as one distinct cluster. When the distance threshold is relaxed to certain degree so that two clusters are no longer considered to be distinct, they are merged. Obviously, such procedure can be represented as a dendrogram (or a tree-like structure), and this is exactly why it is called hierarchical clustering. To be precise, hierarchical clustering is a series of algorithms sharing that same principle but with technical differences.
 
@@ -1802,10 +1802,28 @@ scaled_expr_DEG_list <- lapply(avg_expr_DEG_list, function(x) t(scale(t(x))))
 
 layout(matrix(1:15, nrow = 3, byrow = T))
 par(mar=c(3,3,3,3))
-for(layer in names(scaled_expr_DEG_list))
+for(cl in 1:15)
+  boxplot(scaled_expr_DEG_list[[cl]],
+          main = paste0(cl, " (", nrow(scaled_expr_DEG_list[[cl]]), ")"))
+```
+<p align="center"><img src="img/boxplot_DEG_hcl.png" /></p>
+
+You may have realized. The order of the cluster labels and the order of clustering at the dendrogram are different, which makes it tough to make the link between the labels and their relationship on the tree. The following script may help you figure out this:
+```R
+unique(cl_DEG[hcl_DEG$order])
+```
+This should give you the cluster labels in the same order as in the dendrogram. We can confirm by plotting their expression patterns and sizes again but with the new order
+```R
+layout(matrix(1:15, nrow = 3, byrow = T))
+par(mar=c(3,3,3,3))
+for(layer in unique(cl_DEG[hcl_DEG$order]))
   boxplot(scaled_expr_DEG_list[[layer]],
           main = paste0(layer, " (", nrow(scaled_expr_DEG_list[[layer]]), ")"))
 ```
-<p align="center"><img src="img/boxplot_DEG_hcl.png" /></p>
+<p align="center">
+  <img src="img/heatmap_DEG_clustered_viridis.png" style="width:30%">
+&nbsp; &nbsp;
+  <img src="img/boxplot_DEG_hcl_reordered.png" style="width:65%">
+</p>
 
 <br/><style scoped> table { font-size: 0.8em; } </style>
