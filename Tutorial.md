@@ -1858,11 +1858,13 @@ The ontologies of GO are structured as a graph, with terms as nodes in the graph
 
 Both the ontology and gene annotation can be downloaded at [the Download page of Gene Ontology](http://geneontology.org/docs/downloads/). If you want to search for annotation of one specific gene product, or want to look for genes being annotated with one specific GO term, [QuickGO](https://www.ebi.ac.uk/QuickGO/) by EMBL-EBI provides a nice web interface. It also provides [REST APIs](https://en.wikipedia.org/wiki/Representational_state_transfer) to the data (documentation [here](https://www.ebi.ac.uk/QuickGO/api/index.html)) to make it easier retrieving the ontology and annotation information with a programming way. The GO annotation can also been retrieved from Ensembl with its BioMart web tool, or via the `biomaRt` R package we used above. Meanwhile, the GO ontology information is available in Bioconductor as the R package `GO.db`.
 
-#### KEGG and other functional gene set
+#### KEGG, Reactome and MSigDB
+GO is not the only project and database providing information of gene functions. For example, [KEGG (Kyoto Encyclopedia of Genes and Genomes)](https://www.genome.jp/kegg/) is a database resource for understanding high-level functions and utilities of the biological system. It curates huge amount of molecular pathways in different species, providing information of how different genes, gene products and small molecules regulate, interact, or have chemical interactions with each other. It is one of the most comprehensive database of biological pathways, chemicals and drugs. The database is also available in Bioconductor, as the R package `KEGG.db`. A similar database is [Reactome](https://reactome.org/). Different from the subscription model used by KEGG (only subscribers can download the complete data, others have limited access via web portal or REST API), Reactome is open source and fully open access.
 
+Besides, there is [MSigDB (Molecular Signatures Database)](https://www.gsea-msigdb.org/gsea/msigdb) by UCSD and Broad Institute. It is a resource of tens of thousands of annotated gene sets, but is only available for human and mouse. One can download the gene sets from the website, or alternatively, to use the R package `msigdbr`. Note that the gene sets in MSigDB are grouped into different categories, one of which is curated gene sets (C2) including subcategories of KEGG and Reactome pathways. It can be a good way to obtain genes involved in the two databases, if the reactome, interaction and chemical information are not needed.
 
 #### Enrichment analysis: frequency comparison
-
+With all those resources of gene function annotation, we need to take the advantage of them and try to figure out which biological functions/processes that our identified DEGs are significantly involved.
 
 #### Enrichment analysis: rank distribution comparison
 
