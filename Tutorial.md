@@ -22,7 +22,7 @@
 	  * [ANOVA and ANCOVA](#anova-and-ancova)
 	  * [DESeq2](#deseq2)
     * [3-5 Grouping of the identified DEGs](#3-5-grouping-of-the-identified-degs)
-    * [3-6 Interpretation and annotation of gene sets](#3-6-interpretation-and-annotation-of-gene-sets)
+    * [3-6 Interpretation of gene sets](#3-6-interpretation-of-gene-sets)
     * [3-7 Other analysis](#3-7-other-analysis)
 
 
@@ -1132,7 +1132,7 @@ Now you can create a new R script file by clicking the <img src="img/new_r_scrip
 #### Install required R packages
 In the following analysis of the RNA-seq data, we need several additional R packages which are not preinstalled together with R. The following script should be able to install them. In the R console (either at the terminal or the R console in the RStudio server), do
 ```R
-install.packages(c("tidyverse","ggrepel","BiocManager","pbapply","gplots"))
+install.packages(c("tidyverse","ggrepel","BiocManager","pbapply","gplots","msigdbr"))
 BiocManager::install(c("biomaRt","sva","DESeq2","edgeR"))
 ```
 
@@ -1844,8 +1844,28 @@ Once a network, or a gene co-expression network to be more precise, is defined, 
 
 Here we are not going to show the details of those methods. If you are interested in using those methods, you can start with WGCNA, which is implemented as an R package (`WGCNA`) in Bioconductor (install with `BiocManager::install("WGCNA")`). You can follow the WGCNA tutorial [here](https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/Tutorials/).
 
-### 3-6 Interpretation and annotation of gene sets
+### 3-6 Interpretation of gene sets
 <sub><a href="#top">(Back to top)</a></sub></br>
+With the above analysis, we have obtained groups of DEGs which show different expression patterns across conditions (cortical layers). Next we need to figure out that those different groups of DEGs mean biologically. This is not a simple task, as we need to know the functions of every gene within the gene set, summarize them together, and then compare with genes outside of the gene set and see whether the gene set is significantly enriched in participating or representing certain functions, processes, pathways, components or other biological features.
+
+#### Gene Ontology
+Luckily, there are databases providing functional annotation of genes collected by plenty of researchers dedicating in understanding gene functions. Among them, [Gene Ontology](http://geneontology.org/) (GO) is probably the largest, most well known and most widely used resource for gene function annotation. The Gene Ontology project provides an ontology of defined terms representing gene product properties. The ontology covers three domains:
+* cellular component, the parts of a cell or its extracellular environment;
+* molecular function, the elemental activities of a gene product at the molecular level, such as binding or catalysis;
+* biological process, operations or sets of molecular events with a defined beginning and end, pertinent to the functioning of integrated living units: cells, tissues, organs, and organisms.
+
+The ontologies of GO are structured as a graph, with terms as nodes in the graph and the relations (also known as object properties) between the terms as edges. Among all the relationships, the "is a" (is a subtype of), "part of", "has part" are the most critical and dominating ones, and therefore organize the graph into a tree-like shape with vague hierarchy. After establishing the ontology, different gene products are then linked to those functional terms given references (e.g. journal papers) which provide evidence. This creates a human-readable and machine-friendly annotation for each gene.
+
+Both the ontology and gene annotation can be downloaded at [the Download page of Gene Ontology](http://geneontology.org/docs/downloads/). If you want to search for annotation of one specific gene product, or want to look for genes being annotated with one specific GO term, [QuickGO](https://www.ebi.ac.uk/QuickGO/) by EMBL-EBI provides a nice web interface. It also provides [REST APIs](https://en.wikipedia.org/wiki/Representational_state_transfer) to the data (documentation [here](https://www.ebi.ac.uk/QuickGO/api/index.html)) to make it easier retrieving the ontology and annotation information with a programming way. The GO annotation can also been retrieved from Ensembl with its BioMart web tool, or via the `biomaRt` R package we used above. Meanwhile, the GO ontology information is available in Bioconductor as the R package `GO.db`.
+
+#### KEGG and other functional gene set
+
+
+#### Enrichment analysis: frequency comparison
+
+
+#### Enrichment analysis: rank distribution comparison
+
 
 ### 3-7 Other analysis
 <sub><a href="#top">(Back to top)</a></sub></br>
