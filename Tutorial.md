@@ -22,7 +22,7 @@
 	  * [ANOVA and ANCOVA](#anova-and-ancova)
 	  * [DESeq2](#deseq2)
     * [3-5 Grouping of the identified DEGs](#3-5-grouping-of-the-identified-degs)
-    * [3-6 Interpretation of gene sets](#3-6-interpretation-of-gene-sets)
+    * [3-6 Making sense of the genes](#3-6-making-sense-of-the-genes)
     * [3-7 Other analysis](#3-7-other-analysis)
 
 
@@ -1847,7 +1847,7 @@ Once a network, or a gene co-expression network to be more precise, is defined, 
 
 Here we are not going to show the details of those methods. If you are interested in using those methods, you can start with WGCNA, which is implemented as an R package (`WGCNA`) in Bioconductor (install with `BiocManager::install("WGCNA")`). You can follow the WGCNA tutorial [here](https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/Tutorials/).
 
-### 3-6 Interpretation of gene sets
+### 3-6 Making sense of the genes
 <sub><a href="#top">(Back to top)</a></sub></br>
 With the above analysis, we have obtained groups of DEGs which show different expression patterns across conditions (cortical layers). Next we need to figure out that those different groups of DEGs mean biologically. This is not a simple task, as we need to know the functions of every gene within the gene set, summarize them together, and then compare with genes outside of the gene set and see whether the gene set is significantly enriched in participating or representing certain functions, processes, pathways, components or other biological features.
 
