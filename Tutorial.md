@@ -1,6 +1,6 @@
 # Tutorial for bulk RNA-seq data preprocessing and analysis
 #### Compiled by Zhisong He
-#### Updated on 16 Sept 2022
+#### Updated on 19 Sept 2022
 ### Table of Content
   * [Introduction](#introduction)
   * [Preparation](#preparation)
@@ -1681,7 +1681,7 @@ smoothScatter(-log10(res_DESeq2$pvalue),
 
 <p align="center"><img src="img/scatter_ancova_DESeq2.png" /></p>
 
-The SCC between the two DE analysis is very high (0.86), suggesting that they provide similar estimate of how strong a gene changes its expression in different layers in relative to other genes. Also from the scatter plot showing the -log-transformed p-values it is very clear that the two methods are pretty consistent with each other. Meanwhile, we can also easily see that DESeq2 is much more sensitive in detecting potential differences, given the much smaller p-values (large -log10(p)) it output. Indeed, when we check the number of identified DEGs with the two methods using the same criteria (Bonferroni-corrected p < 0.1), we get a lot more DEGs with the DESeq2 results.
+The SCC between the two DE analysis is very high (0.86), suggesting that they provide similar estimates how strong a gene changes its expression in different layers in relative to other genes. Also from the scatter plot showing the -log-transformed p-values it is very clear that the two methods are pretty consistent with each other. Meanwhile, we can also easily see that DESeq2 is much more sensitive in detecting potential differences, given the much smaller p-values (large -log10(p)) it output. Indeed, when we check the number of identified DEGs with the two methods using the same criteria (Bonferroni-corrected p < 0.1), we get a lot more DEGs with the DESeq2 results.
 ```R
 table(p.adjust(res_DESeq2$pvalue, method="bonferroni") < 0.1,
       res_DE %>% filter(gene %in% rownames(res_DESeq2)) %>% pull(padj) < 0.1)
@@ -1692,7 +1692,7 @@ table(p.adjust(res_DESeq2$pvalue, method="bonferroni") < 0.1,
   TRUE   4937  1227
 </code></pre>
 
-The `table` function gives a frequency matrix of each combination given the two vectors. Rows are values of the first vector, and Columns are values of the second one. As we can see, basically all DEGs in our self-made test (column TRUE) are also DEGs in DESeq2 result (row TRUE); meanwhile, there are lots of DEGs in DESeq2 which don't pass the p-value threshold in the self-made test.
+The `table` function gives a frequency matrix of each combination given the two vectors. Rows are values of the first vector, and columns are values of the second one. As we can see, basically all DEGs in our self-made test (column TRUE) are also DEGs in DESeq2 result (row TRUE); meanwhile, there are lots of DEGs in DESeq2 which don't pass the p-value threshold in the self-made test.
 
 ### 3-5 Grouping of the identified DEGs
 <sub><a href="#top">Back to top</a></sub><br/>
@@ -1705,7 +1705,8 @@ We can simply split them into up-regulated and down-regulated, based on their av
 We can choose to group them based on at which condition (layer) that they show the highest average expression level, for instance. Here we use the DEGs from our self-made test as the example
 ```R
 DEG <- res_DE$gene[res_DE$DE]
-avg_expr <- sapply(sort(unique(meta$Layer)), function(layer) rowMeans(expr[,which(meta$Layer == layer)]))
+avg_expr <- sapply(sort(unique(meta$Layer)), function(layer)
+  rowMeans(expr[,which(meta$Layer == layer)]))
 max_layer_DEG <- setNames(colnames(avg_expr)[apply(avg_expr[DEG,], 1, which.max)], DEG)
 ```
 
@@ -1744,7 +1745,8 @@ The second critical component of a hierarchical clustering algorithm is the link
 
 Here, we try to do hierarchical clustering on the DEGs identified with our self-made test, using the pairwise Spearman correlation distance across the average expression levels of layers as the distance function and the default complete linkage criteria.
 ```R
-avg_expr <- sapply(sort(unique(meta$Layer)), function(layer) rowMeans(expr[,which(meta$Layer == layer)]))
+avg_expr <- sapply(sort(unique(meta$Layer)), function(layer)
+  rowMeans(expr[,which(meta$Layer == layer)]))
 corr_DEG <- cor(avg_expr[res_DE$gene[res_DE$DE],], method = "spearman")
 hcl_DEG <- hclust(as.dist(1 - corr_DEG), method = "complete")
 plot(hcl_DEG, labels = FALSE)
@@ -1756,7 +1758,7 @@ plot(hcl_DEG, labels = FALSE)
 
 <p align="center"><img src="img/hcl_DEG.png" /></p>
 
-Practically speaking, clusters can now be easily obtained by defining a cutting location at the y-axis of the tree. However, right then we encounter one major difficulty when doing hierarchical clustering: at which location shall we cut, or how many clusters we can actually need? There is usually no easy answer. There are algorithms that try to do it objectively and fully data-driven. For instance, one can cut at the place with the largest gap between two nearby branching points. On the other hand, clustering is just a way of grouping genes with similar behavior together, and there is in any case no good answer, or probably no such a uniquely correct answer, that how many real groups exist. Therefore, I personally don't think one has to do the cut in a fully objective manner. You can explore a little bit, to try several numbers of clusters and check their behaviors, then pick the one you like the best. It is also possible to do it more flexibly, like firstly choosing a larger number of clusters, and then merging some of them when there a valid reason.
+Practically speaking, clusters can now be easily obtained by defining a cutting location at the y-axis of the tree. However, right then we encounter one major difficulty when doing hierarchical clustering: at which location we should cut, or how many clusters we actually need? There is usually no easy answer. There are algorithms that try to do it objectively and fully data-driven. For instance, one can cut at the place with the largest gap between two nearby branching points. On the other hand, clustering is just a way of grouping genes with similar behavior together, and there is in any case no good answer, or probably no such a uniquely correct answer, that how many real groups exist. Therefore, I personally don't think one has to do the cut in a fully objective manner. You can explore a little bit, try several numbers of clusters and check their behaviors, then pick the one you like the best. It is also possible to do it more flexibly, like firstly choosing a larger number of clusters, and then merging some of them when there a valid reason.
 
 To assist making decision, one can visualize the correlation/distance matrix, with rows and columns ordered by the dendrogram from the hierarchical clustering.
 ```R
@@ -1801,7 +1803,8 @@ heatmap.2(corr_DEG, Rowv = as.dendrogram(hcl_DEG), Colv = as.dendrogram(hcl_DEG)
 
 We can now check the average expression patterns of those clusters across different layers
 ```R
-avg_expr <- sapply(sort(unique(meta$Layer)), function(layer) rowMeans(expr[,which(meta$Layer == layer)]))
+avg_expr <- sapply(sort(unique(meta$Layer)), function(layer)
+  rowMeans(expr[,which(meta$Layer == layer)]))
 avg_expr_DEG_list <- tapply(names(cl_DEG), cl_DEG, function(x) avg_expr[x,])
 scaled_expr_DEG_list <- lapply(avg_expr_DEG_list, function(x) t(scale(t(x))))
 
@@ -1866,16 +1869,16 @@ Besides, there is [MSigDB (Molecular Signatures Database)](https://www.gsea-msig
 #### Enrichment analysis: frequency comparison
 With all those resources of gene function annotation, we need to take the advantage of them and try to figure out which biological functions/processes that our identified DEGs are significantly involved. As mentioned above, one straightforward strategy is to check whether in the gene group in focus there is any significant enrichment of genes participating or representing certain biological functions, processes or components, in relative to other genes. There are quite some tests which assess the significance of association between two kinds of classifications, and can be therefore used to check enrichment. The famous examples include [Fisher's exact test](https://en.wikipedia.org/wiki/Fisher%27s_exact_test) and [chi-squared test](https://en.wikipedia.org/wiki/Chi-squared_test). When using the two tests, the two classifications to test for association are whether a gene is in the gene group, and whether a gene is annotated to a functional category. In addition, it is also possible to formulate it with a similar but different way. Assume there are in total $N$ genes, $K$ of which are associated to a functional annotation. If we now randomly pick $n$ genes with $n$ being the size of the gene group we are going to test, then the number of genes among those $n$ genes which are associated to the annotation follows a [hypergeometric distribution](https://en.wikipedia.org/wiki/Hypergeometric_distribution), or can also be approximated as a [binomial distribution](https://en.wikipedia.org/wiki/Binomial_distribution) when $N$ is much larger than $n$. Therefore, we can also use hypergeometric test or binomial test to see whether the real number $k$ is significantly larger than the number we expect from the distributions.
 
-In principle, we have now everything we need to wrap up an algorithm by ourselves to do the test, just as we did above for the DE analysis. Meanwhile, there are already tools which implement exactly those (or with a bit modification without changing the principle). It would be easier to just use them.
+In principle, we have now everything we need to build an algorithm by ourselves to do the test, just as we did above for the DE analysis. Meanwhile, there are already tools which implement exactly those (or with a bit modification without changing the principle). It would be just easier to use them.
 
-Among them, [DAVID](https://david.ncifcrf.gov/) (Database for Annotation, Visualization and Integrated Discovery) is probably the most commonly used tool for biologist to check functional enrichment given a gene list. It incorporates functional annotations of genes from different databases, including GO, KEGG, Reactome that mentioned above, as well as other databases such as [OMIM](https://www.omim.org/), an online catalog of human genes and genetic disorders; [UniprotKB Keywords](https://www.uniprot.org/help/keywords), which constitute a controlled vocabulary with a hierarchical structure; [InterPro](https://www.ebi.ac.uk/interpro/), which provides functional analysis of proteins by classifying them into families and predicting domains and important sites; [SMART](http://smart.embl-heidelberg.de/), which allows the identification and annotation of genetically mobile domains and the analysis of domain architectures. DAVID uses a slightly modified Fisher's exact test for enrichment significance analysis (EASE Score), where it counts one less genes in the gene group that annotated in a functional categories so that the result is more conservative.
+Among those methods, [DAVID](https://david.ncifcrf.gov/) (Database for Annotation, Visualization and Integrated Discovery) is probably the most commonly used tool for biologist to check functional enrichment given a gene list. It incorporates functional annotations of genes from different databases, including GO, KEGG, Reactome that mentioned above, as well as other databases such as [OMIM](https://www.omim.org/), an online catalog of human genes and genetic disorders; [UniprotKB Keywords](https://www.uniprot.org/help/keywords), which constitute a controlled vocabulary with a hierarchical structure; [InterPro](https://www.ebi.ac.uk/interpro/), which provides functional analysis of proteins by classifying them into families and predicting domains and important sites; [SMART](http://smart.embl-heidelberg.de/), which allows the identification and annotation of genetically mobile domains and the analysis of domain architectures. DAVID uses a slightly modified Fisher's exact test for enrichment significance analysis (EASE Score), where it counts one less genes in the gene group that annotated in a functional categories in order to get a more conservative estimate.
 
 <p align="center"><img src="img/david_start.png" /></p>
 
-DAVID has an [official quick start tutorial](https://david.ncifcrf.gov/helps/tutorial.pdf) which nicely describes the steps to run different tools. Therefore, we won't go through every step here. Still, there are some points that worths a mentioning.
-1. As the first step, DAVID requires the upload of the gene list to test, by either pasting the full list in the text box (one line per gene), or providing a text file with all the genes (one line per gene). With the gene groups obtained by clustering or other gene grouping methods, you can use the `write.table` function to output the list of genes into a text file, and then upload that file to DAVID
+DAVID has an [official quick start tutorial](https://david.ncifcrf.gov/helps/tutorial.pdf) which nicely describes the steps to run different tools. Therefore, we won't go through every step here. Still, there are several points that I think worth a mentioning.
+1. As the first step, DAVID requires the upload of the gene list to test, by either pasting the full list in the text box (one line per gene), or uploading a text file with all the genes (one line per gene). With the gene groups obtained by clustering or other gene grouping methods, you can use the `write.table` function to output the list of genes into a text file, and then upload that file to DAVID
 2. DAVID allows many different gene IDs and symbols, including the official gene symbol (`hgnc_symbol`) and Ensembl ID. If the data you have are from human and mouse, and you use the GENCODE annotation, then you have to keep in mind that although the gene IDs in GENCODE are essentially Ensembl IDs, they additionally contain the version (therefore it is called `ensembl_gene_id_version`). You shall remove the part after "." to get the Ensembl IDs; or you shall use the `ensembl_gene_id` column if you has retrieved the gene information with `biomaRt` as described earlier
-3. **THIS IS CRITICAL**. To check enrichment, a **background** gene panel is necessary. Any enrichment of genes related to a functional term means higher frequency than in the background gene panel. Therefore, a different background gene panel can result in completely different enrichment results. By default, DAVID uses all the genes in the species as the background. This is kinds of OK, but if your data is from a specific system, e.g. all the brain samples, using all genes as the background may lead to misleading results. As a gene needs to be expressed first to be detected as a DEG, and genes being expressed in this specific system already have biased distribution on their functions, even just randomly select genes from the expressed genes would likely result in some enriched functional terms. However, they represent the features of the studied system instead of the special features of the gene list. In that case, it is recommended to use a different background which is adapted from the system, e.g. only the expressed genes in the data.
+3. **THIS IS CRITICAL**. To check enrichment, a **background** gene panel is needed. An enrichment of a functional term means higher frequency in the gene list than in the background gene panel. Therefore, a different background gene panel can result in completely different enrichment results. By default, DAVID uses all the genes in the species as the background. This is kinds of OK, but if your data is from a specific system, e.g. all are brain samples, using all genes as the background may give misleading results. A gene needs to be expressed to be detected as a DEG, and genes being expressed in this specific system already have biased distribution on their functions. Therefore, even just randomly select genes from the expressed genes would likely result in some enriched functional terms, although they don't mean anything special in the system. To avoid this issue, it is recommended to use a different background which is more adaptive to the system, e.g. only the expressed genes in the data.
 
 As an example, we can output the genes in a group we obtained earlier, as well as all the expressed genes, to text files, and then use them to run DAVID.
 ```R
@@ -1887,29 +1890,30 @@ write.table(meta_genes[meta_genes$expressed, "ensembl_gene_id"],
             quote = F, row.names = F, col.names = F)
 ```
 
+If we provide the gene list and background to DAVID and then run the "Functional Annotation Chart" analysis, this is what we get.
 <p align="center">
 <img src="img/david_c2.png" /><br/>
 <sub><i>The "Functional Annotation Chart" output of DAVID on C2 genes, given the expressed genes as the background</i></sub>
 </p>
 
-It looks like a strong enrichment on "extracellular exosome", as well as quite some other functional terms, of the C2 genes.
+There is a strong enrichment of "extracellular exosome", as well as some other functional terms, of the C2 genes.
 
-You would have to output the gene lists of different clusters into different text files, and then repeat the upload gene list -> select background -> do analysis -> download results pipeline manually.
+This is the result for one cluster. Next you would have to output the gene lists of different clusters into different text files, and then repeat the upload gene list -> select background -> do analysis -> download results pipeline manually.
 
-DAVID also has a [REST API](https://david.ncifcrf.gov/content.jsp?file=DAVID_API.html) for programmable access to the service. However, it has a lot of limitations on the number of genes in the gene list, the number of queries per computer per day (it defines a computer based on the IP address, so multiple computers sharing the same IP, for instance, computers within the ETH network, would be considered as one), and so on. Therefore, it is not really a good option to run DAVID.
+You may be annoyed by that, and want to search around whether there is any way to make it automatic. Indeed, DAVID has a [REST API](https://david.ncifcrf.gov/content.jsp?file=DAVID_API.html) for programmable access to the service. However, it has a lot of limitations on the number of genes in the gene list, the number of queries per computer per day (it defines a computer based on the IP address, so multiple computers sharing the same IP, for instance, computers within the ETH network, would be considered as one), and so on. Therefore, it is not really a good option to run DAVID.
 
-On the other hand, the limitations of DAVID, as a purely web-based service, is also obvious.
+So generally speaking, DAVID is a great tool. It is easy to use, and has already incorporated many functional annotations. On the other hand, the limitations of DAVID, as a purely web-based service, is also obvious. For example:
 1. It doesn't allow large scale enrichment analysis with multiple gene lists
 2. It doesn't allow customized analysis with user-defined functional gene sets or annotations. This could be a big issue if DAVID doesn't contain the information you need (e.g. the species of your interest is not among the DAVID collection)
 3. The sensitivity of DAVID is relative low. On top of the conservative EASE score being used by DAVID, its power is also limited by the fact that every functional term, regardless their relationship in the ontology, are considered as independent, which is expected to provide conservative results
 4. Its support of programmable analysis is extremely weak, only with the REST API which has lots of limitations
 
-If any of those really matters a lot to you, you would need a different tool which is programmable and customizable, although you would have to take care of more stuffs like getting the functional annotation collections and so on. Indeed, there are alternative tools available. [topGO](https://bioconductor.org/packages/release/bioc/html/topGO.html), an R package available in Bioconductor (install with `BiocManager::install("topGO")`), is one of the most commonly used one among the others. Comparing to DAVID, it allows large scale testing via looping through your gene lists. It also allows different tests to be used, and customized GO databases. The latter one is useful when you are dealing with some species which are not available in DAVID, but with their GO information available somewhere else. Here we are not going into the details. You can try to follow its [official tutorial](https://bioconductor.org/packages/release/bioc/vignettes/topGO/inst/doc/topGO.pdf) to set up the test by yourself.
+If any of those really matters a lot to you, you would need a different tool which is programmable and customizable, although you would have to take care of more stuffs like getting the functional annotation collections and so on. There are alternative tools available. [topGO](https://bioconductor.org/packages/release/bioc/html/topGO.html), an R package available in Bioconductor (install with `BiocManager::install("topGO")`), is one of the most commonly used one among the others. Comparing to DAVID, it allows large scale testing via looping through your gene lists. It also allows different tests to be used, and customized GO databases. The latter one is useful when you are dealing with some species which are not available in DAVID, but with their GO information available somewhere else. Here we are not going into the details. You can try to follow its [official tutorial](https://bioconductor.org/packages/release/bioc/vignettes/topGO/inst/doc/topGO.pdf) to set up the test by yourself.
 
 #### Enrichment analysis: rank distribution comparison
 The frequency-based test should satisfied the need in most of the time. Meanwhile, you may still feel some limitations on it. For instance, the power of the frequency-based test is related to the number of genes in the gene list. When the gene list is small (only handful ones, for example), even if they are all annotated to one functional term, you may still not get that term as a significantly enriched one. Also, since in many cases the gene list to test is derived from DE analysis, and is greatly influenced by the criteria of DE which is usually quite arbitary. This is why the rank-based statistical tests for enrichment analysis are developed and used. Among them, [GSEA (Gene Set Enrichment Analysis)](https://www.gsea-msigdb.org/gsea/index.jsp) is the most widely used one. Instead of using a gene list of interest, it takes a ranked list of all the genes in the analysis. For example,  one common approach for two-condition comparison is after doing the DE analysis, to represent each gene by $s_{g} = sign(logFC_{g}) \times (-log_{10}{P_{g}})$. Afterwards, genes are ordered based on $s_{g}$, resulting in a ordered gene list with their scores as the input to GSEA. Next, GSEA applies a procedure similar to [Kolmogorov–Smirnov test (KS test)](https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test) which estimates the significance of divergence between [CDFs (cumulative distribution functions)](https://en.wikipedia.org/wiki/Cumulative_distribution_function) of two distributions, to compare the score distributions of genes in an annotated gene set and those are not by calculating the [ES (Enrichment Score)](https://en.wikipedia.org/wiki/Gene_set_enrichment_analysis#Methods). The significance of ES is then estimated by a phenotypic-based (or gene-based when there is few samples) permutation test in order to produce a null distribution for the ES.
 
-The original GSEA is a standalone software. More recently there is the `fgsea` R package developed by the Computer Technologies Laboratory, ITMO University, Russia, which allows us to do the analysis fast, so that it is easier to incorporate with the other analysis done earlier in R. The `fgsea` is available in Bioconductor and can be installed with `BiocManager::install("fgsea")`. The core function of the package, `fgsea`, expects two main input: a list with each component being genes in a pathway or gene set, and a named (by gene names that's also used by the pathway list) vector of gene scores in the descending order.
+The original GSEA is a standalone software. More recently, there is the `fgsea` R package developed by the Computer Technologies Laboratory, ITMO University, Russia. With its help, it is now much easier to incorporate GSEA with the other analysis done in R. The `fgsea` is available in Bioconductor and can be installed with `BiocManager::install("fgsea")`. The core function of the package, `fgsea`, expects two main input: a list with each component being genes in a pathway or gene set, and a named (by gene names that's also used by the pathway list) vector of gene scores in the descending order.
 
 One problem here is that the ranking procedure only works well when there is a reference condition with every other conditions compared to it, or it is the even simpler case that only two conditions are compared. This is not the case in our example. On the other hand, if you really eager to try GSEA to see whether there is anything interesting can be found, you can redo the analysis in a different way so that it is possible to derive the scores. For example, for each layer, we can apply DE analysis to compare samples of the layer and samples of the other layers to derive the p-values and fold changes. Let's take L4 as the example and use our self-made test as an example.
 ```R
@@ -1941,7 +1945,87 @@ fgsea_kegg <- fgsea(pathways = genesets_celltype_list,
                     maxSize  = 500)
 ```
 
+We can then check the most enriched cell type signatures in L4 samples, by ordering the output by the `NES` column which is the enrichment score normalized to mean enrichment of random samples of the same size (higher means more enrichment)
+```R
+fgsea_kegg[order(NES,decreasing=T),][1:10,1:7]
+```
+```
+                                        pathway         pval         padj   log2err        ES      NES size
+ 1:             MANNO_MIDBRAIN_NEUROTYPES_HSERT 3.569422e-25 2.297033e-23 1.3030932 0.5210432 2.221238  437
+ 2:             MANNO_MIDBRAIN_NEUROTYPES_HOMTN 6.949540e-17 1.069160e-15 1.0574636 0.4851141 2.055434  372
+ 3:              MANNO_MIDBRAIN_NEUROTYPES_HDA2 3.307013e-17 5.221600e-16 1.0672100 0.4610982 1.972775  491
+ 4:      DESCARTES_FETAL_ADRENAL_SYMPATHOBLASTS 2.095859e-06 9.824340e-06 0.6272567 0.5216453 1.965628   96
+ 5:            MANNO_MIDBRAIN_NEUROTYPES_HNBML5 4.827999e-15 6.297390e-14 0.9969862 0.4588602 1.958707  447
+ 6:                      ZHONG_PFC_C3_MICROGLIA 1.648692e-17 2.747820e-16 1.0768682 0.4578260 1.957619  484
+ 7:               MANNO_MIDBRAIN_NEUROTYPES_HDA 1.239105e-15 1.728984e-14 1.0175448 0.4548870 1.945145  480
+ 8: DESCARTES_FETAL_CEREBRUM_INHIBITORY_NEURONS 4.493320e-04 1.368524e-03 0.4984931 0.6252265 1.943029   30
+ 9:               MANNO_MIDBRAIN_NEUROTYPES_HRN 1.140901e-11 1.037183e-10 0.8753251 0.4580463 1.927661  327
+10:  FAN_EMBRYONIC_CTX_BIG_GROUPS_CAJAL_RETZIUS 9.630173e-14 1.050564e-12 0.9545416 0.4399059 1.881169  471
+```
+
+The detailed descriptions don't fully make sense, given that the samples are all from cerebral cortex instead of midbrains. Still, they are all mostly neurons which implies that L4 shows enriched of neurons in relative to other layers. We can also visualize the GSEA results with the famous GSEA enrichment plot
+```R
+plotEnrichment(genesets_celltype_list[["MANNO_MIDBRAIN_NEUROTYPES_HNBML5"]],
+               scores_ordered) + labs(title="hNbML5 GABAergic neurons")
+```
+<p align="center"><img src="img/gsea_L4_hnbml5.png" /></p>
+The plot is conceptually similar to the plot output by the original GSEA, whose description is available <a href="https://www.gsea-msigdb.org/gsea/doc/GSEAUserGuideTEXT.htm#_Enrichment_Score_(ES)">here</a>. In brief, the lines at the bottom show the ranks of genes in the gene set, the green curve shows how the enrichment accumulates and the red dash line shows the peak enrichment (the ES score).
+
+Similarly, we can also check gene sets which are significantly depleted from the top of the ranked gene list, or alternatively, enriched at the end part of the list (i.e. enriched in other layers).
+```R
+fgsea_kegg[order(NES,decreasing=F),][1:10,1:7]
+```
+```
+                                                     pathway         pval         padj  log2err         ES       NES size
+ 1:                       RUBENSTEIN_SKELETAL_MUSCLE_T_CELLS 7.020977e-35 1.053146e-32 1.536459 -0.6588237 -3.497411  175
+ 2:                BUSSLINGER_GASTRIC_PPP1R1B_POSITIVE_CELLS 6.566356e-27 6.566356e-25 1.342234 -0.6961655 -3.418915  113
+ 3:                                TRAVAGLINI_LUNG_CLUB_CELL 3.828389e-25 2.297033e-23 1.303093 -0.6956738 -3.380662  104
+ 4:                         ZHONG_PFC_MAJOR_TYPES_ASTROCYTES 1.000000e-50 6.000000e-48       NA -0.6084616 -3.332992  323
+ 5:                    BUSSLINGER_GASTRIC_LYZ_POSITIVE_CELLS 5.034813e-23 2.013925e-21 1.246233 -0.6894582 -3.279067   96
+ 6:                       RUBENSTEIN_SKELETAL_MUSCLE_B_CELLS 5.703099e-25 3.110781e-23 1.295123 -0.5958186 -3.153053  168
+ 7: LAKE_ADULT_KIDNEY_C7_PROXIMAL_TUBULE_EPITHELIAL_CELLS_S3 3.198483e-22 1.128876e-20 1.221054 -0.6251697 -3.132713  128
+ 8:                       FAN_EMBRYONIC_CTX_BIG_GROUPS_GLIAL 7.608477e-22 2.536159e-20 1.212545 -0.6115603 -3.095444  132
+ 9:                                HU_FETAL_RETINA_MICROGLIA 3.478122e-38 6.956243e-36 1.608880 -0.5160463 -2.967230  379
+10:                   FAN_EMBRYONIC_CTX_BIG_GROUPS_MICROGLIA 2.024103e-38 6.072310e-36 1.615302 -0.5219661 -2.961173  371
+```
+
+We see astrocytes here, suggesting that astrocytes are more likely in other layers.
+
 ### 3-7 Other analysis
 <sub><a href="#top">(Back to top)</a></sub></br>
+In the previous sections we have gone through the most typical analysis of RNA-seq data to compare different biological conditions and make sense of it. Meanwhile, it's worth mentioning that more analysis can be done for RNA-seq data to understand the biological insight.
+
+#### Transcriptome deconvolution
+One analysis is transcriptome deconvolution. In most of time, the RNA-seq experiments are applied to complex tissues comprised of numerous different cell types. For example, the human brains contain different subtypes of neurons, as well as different types of non-neuronal glial cells such as astrocytes, oligodendrocytes, oligodendrocyte precursor cells, microglia, and vascular cells. Each of those cell types expresses a distinct set of genes at varied levels, and the transcriptomic profiles we got from the brain samples are just the average of them, weighted by their proportions in the samples. Therefore, any transcriptomic change we observe in brain samples at different conditions could mean at least one of the two things: the cell type composition is changed in a condition, or the molecular profiles of the cell type(s) are changed. Then which one is the major contributor? How can we figure that out?
+
+The most straightforward way to answer the question, is of course to directly measure it. As the development and application of single-cell RNA sequencing (scRNA-seq) technologies, where each cell in a sample is captured separately, then lysed, and with the RNA captured, reversed transcribed into cDNA, and then sequenced. By comparing the transcriptome of hundreds, thousands or even millions of cells, we know which cells belong to the same cell type, and which cell types they are. Afterwards we can easily compare the composition of cell types in different conditions, as well as the transcriptomic changes in each cell type between different conditions.
+
+However, when this is not feasible, can we still do something with the bulk RNA-seq data we have?
+
+It depends. If we have no idea about what cell types could be available in the sample, or we only know partially and the unknown component represent a reasonable amount of cells in the sample, or we know what cell types we have but have no idea about how their transcriptome look like, then very likely we have no way to check. On the other hand, if we know the cell types representing majority of cells in the sample, and we have the data showing how the transcriptome of each of those cell type looks, we can estimate the cell type composition of a bulk sample given its RNA-seq using [deconvolution](https://en.wikipedia.org/wiki/Deconvolution) algorithms. This is so-called transcriptome deconvolution.
+
+Mathematically, the observed gene expression profiles of the mixture samples $\textbf{T}$ can be approximated as $\textbf{C} \times \textbf{P}$, where $\textbf{C}$ is the gene expression profiles of different cell types, and $\textbf{P}$ is the cell type proportions across samples. Now given $\textbf{T}$ and $\textbf{C}$, we can try to estimate $\textbf{P}$ using different algorithms. Those algorithms include [quadratic programming](https://en.wikipedia.org/wiki/Quadratic_programming) which can solve a constrained (all the proportions should be non-negative with sum equals to 1) linear least-square problem; [CIBERSORT/CIBERSORTx](https://cibersortx.stanford.edu/) which uses a ν-SVR (ν-[support vector regression](https://en.wikipedia.org/wiki/Support-vector_machine#Regression)) model to estimate the cell type proportions.
+
+As an example, CIBERSORT was applied to the RNA-seq data of the complete human data set in the paper where we got the example data set in the tutorial, given the cell type transcriptome profiles obtained from [an early study of applying scRNA-seq on human brains](https://www.pnas.org/doi/10.1073/pnas.1507125112). There, we can also see that sections representing L4 indeed shows enrichment of neurons and depletion of astrocytes in relative to many other layers, which is consistent with what we saw earlier with the GSEA analysis.
+<p align="center">
+<img src="img/layer_deconvolution.png"/><br/>
+<sub><i>Figure 4a of the <a href="https://www.nature.com/articles/nn.4548#Fig4">paper</a></i></sub>
+</p>
+
+#### Alternative splicing
+Another analysis is to look at alternative splicing, or more broadly, the isoform-level abundances. As already mentioned, most genes in eukaryotes can be transcribed into different isoforms due to alternative splicing, alternative promoters, and alternative transcription ends. The short-read sequencing technology that most of the RNA-seq data rely on is surely not the best method to look at that, as reads are sequenced independently without know connections with other reads, and in most of the time the reads are too short to cover all the splicing events on the gene. For that, the long-read sequencing technologies such as [PacBio](https://www.pacb.com/technology/hifi-sequencing/how-it-works/) and [Oxford Nanopore Technologies](https://nanoporetech.com/applications/dna-nanopore-sequencing) are probably the better options.
+
+Still, given the high throughput of the RNA-seq data, as well as the assumption that the random fragmentation step in cDNA library preparation can principally generate reads covering the whole transcript uniformly (which is very unlikely to be true because of the existence of RNase which degrades the RNA molecules from the two terminals, together with the fact that most RNA-seq protocol uses oligo-T probes to enrich mRNA which requires an intact 3' end but not the 5' end), it is still possible to study alternative splicing. What can be potentially done includes:
+1. Identification of novel splicing sites. This information can be got by looking at reads that aligned to disconnected parts of the genome with large gap in between, and compare those junction sites with the known splicing junctions in the gene annotation databases. One can also do [de novo transcriptome assembly](https://en.wikipedia.org/wiki/De_novo_transcriptome_assembly) to identify novel isoforms. This is potentially an informative analysis for disease studies (especially cancer) where noncanonical splicing is possible (an example study [here](https://www.nature.com/articles/srep01689) on breast cancer).
+2. Quantify and compare the usage of exon-exon junctions. Although the quantification on transcript level could be tricky given the RNA-seq data based on short-read sequencing, to quantify the likelihood to skipping an alternative exon (exon skipping event) is still possible and relatively accurate, especially when focusong on only the annotated alternative exons. From the read alignment result, one can count the number of reads covering the alternative exon, as well as the number of reads skipping the exon. These two numbers can be then formulated by a binomial distribution, or a more complicated distribution, where instead of a fixed expected inclusion proportion per condition, a random proportion following a normal distribution across individuals of the same condition is used to model individual and technical variations (conceptually similar to the DE analysis above). One example method is [rMATS](https://www.pnas.org/doi/10.1073/pnas.1419161111). Once the statistical framework is established, one can then use the RNA-seq data to study alternative splicing in different processes, such as [diseases](https://www.sciencedirect.com/science/article/pii/S1535610818303064), [development](https://www.nature.com/articles/s41588-021-00851-w), [evolution](https://rnajournal.cshlp.org/content/24/4/585.abstract).
+
+<p align="center">
+<img src="img/exon_skipping.png" /><br/>
+<sub><i>Figure 1 of the <a href="https://www.pnas.org/doi/10.1073/pnas.1419161111">rMATS paper</a></i></sub>
+</p>
+
+## THE END
+<sub><a href="#top">(Back to top)</a></sub></br>
+Now we come to the end of this tutorial. I hope it has covered the most important parts of RNA-seq data preprocessing and analysis, and is sufficient for you to start. Still, it won't be possible to cover everything, and there are always different and creative ways to analyze the data depending the questions you want to answer with the data. This is just the beginning.
 
 <br/><style scoped> table { font-size: 0.8em; } </style>
