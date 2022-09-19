@@ -1546,7 +1546,7 @@ We can also wrap up all the three parts into one function.
 ```R
 DE_test <- function(expr,
                     cond,
-					ctrl = NULL,
+                    ctrl = NULL,
                     covar = NULL,
                     padj_method = p.adjust.methods){
   pval_fc <- data.frame(t(pbapply(expr, 1, function(e){
@@ -1561,16 +1561,16 @@ DE_test <- function(expr,
     pval <- test$Pr[2]
     
     avgs <- tapply(log1p(e), cond, mean)
-	if (! is.null(ctrl) && sum(cond %in% ctrl) > 0){
-	  fc <- exp(max(avgs) - avgs[ctrl])
-	} else{
+    if (! is.null(ctrl) && sum(cond %in% ctrl) > 0){
+      fc <- exp(max(avgs[names(avgs) != ctrl]) - avgs[ctrl])
+    } else{
       fc <- exp(max(avgs) - min(avgs))
-	}
+    }
     
-    return(c(pval = pval, fc = fc))
+    return(c(pval = unname(pval), fc = unname(fc)))
   })), row.names = rownames(expr))
   padj <- p.adjust(pval_fc$pval, method = padj_method)
-  return(data.frame(pval_fc, padj)[,c("pval","padj","fc")])
+  return(data.frame(pval_fc, "padj" = padj)[,c("pval","padj","fc")])
 }
 
 res_DE <- DE_test(expr = expr[meta_genes$expressed,],
@@ -1907,7 +1907,39 @@ On the other hand, the limitations of DAVID, as a purely web-based service, is a
 If any of those really matters a lot to you, you would need a different tool which is programmable and customizable, although you would have to take care of more stuffs like getting the functional annotation collections and so on. Indeed, there are alternative tools available. [topGO](https://bioconductor.org/packages/release/bioc/html/topGO.html), an R package available in Bioconductor (install with `BiocManager::install("topGO")`), is one of the most commonly used one among the others. Comparing to DAVID, it allows large scale testing via looping through your gene lists. It also allows different tests to be used, and customized GO databases. The latter one is useful when you are dealing with some species which are not available in DAVID, but with their GO information available somewhere else. Here we are not going into the details. You can try to follow its [official tutorial](https://bioconductor.org/packages/release/bioc/vignettes/topGO/inst/doc/topGO.pdf) to set up the test by yourself.
 
 #### Enrichment analysis: rank distribution comparison
+The frequency-based test should satisfied the need in most of the time. Meanwhile, you may still feel some limitations on it. For instance, the power of the frequency-based test is related to the number of genes in the gene list. When the gene list is small (only handful ones, for example), even if they are all annotated to one functional term, you may still not get that term as a significantly enriched one. Also, since in many cases the gene list to test is derived from DE analysis, and is greatly influenced by the criteria of DE which is usually quite arbitary. This is why the rank-based statistical tests for enrichment analysis are developed and used. Among them, [GSEA (Gene Set Enrichment Analysis)](https://www.gsea-msigdb.org/gsea/index.jsp) is the most widely used one. Instead of using a gene list of interest, it takes a ranked list of all the genes in the analysis. For example,  one common approach for two-condition comparison is after doing the DE analysis, to represent each gene by $s_{g} = sign(logFC_{g}) \times (-log_{10}{P_{g}})$. Afterwards, genes are ordered based on $s_{g}$, resulting in a ordered gene list with their scores as the input to GSEA. Next, GSEA applies a procedure similar to [Kolmogorov–Smirnov test (KS test)](https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test) which estimates the significance of divergence between [CDFs (cumulative distribution functions)](https://en.wikipedia.org/wiki/Cumulative_distribution_function) of two distributions, to compare the score distributions of genes in an annotated gene set and those are not by calculating the [ES (Enrichment Score)](https://en.wikipedia.org/wiki/Gene_set_enrichment_analysis#Methods). The significance of ES is then estimated by a phenotypic-based (or gene-based when there is few samples) permutation test in order to produce a null distribution for the ES.
 
+The original GSEA is a standalone software. More recently there is the `fgsea` R package developed by the Computer Technologies Laboratory, ITMO University, Russia, which allows us to do the analysis fast, so that it is easier to incorporate with the other analysis done earlier in R. The `fgsea` is available in Bioconductor and can be installed with `BiocManager::install("fgsea")`. The core function of the package, `fgsea`, expects two main input: a list with each component being genes in a pathway or gene set, and a named (by gene names that's also used by the pathway list) vector of gene scores in the descending order.
+
+One problem here is that the ranking procedure only works well when there is a reference condition with every other conditions compared to it, or it is the even simpler case that only two conditions are compared. This is not the case in our example. On the other hand, if you really eager to try GSEA to see whether there is anything interesting can be found, you can redo the analysis in a different way so that it is possible to derive the scores. For example, for each layer, we can apply DE analysis to compare samples of the layer and samples of the other layers to derive the p-values and fold changes. Let's take L4 as the example and use our self-made test as an example.
+```R
+DE_L4 <- DE_test(expr = expr[meta_genes$expressed,],
+                 cond = meta$Layer == "L4",
+                 ctrl = "FALSE",
+                 covar = meta %>% dplyr::select(Individual)) %>%
+  tibble::rownames_to_column("gene")
+```
+
+Now we can derive the gene scores.
+```R
+scores <- setNames(sign(log(DE_L4$fc)) * (-log10(DE_L4$pval)),
+                   setNames(meta_genes$ensembl_gene_id,
+                            meta_genes$ensembl_gene_id_version)[DE_L4$gene])
+scores_ordered <- sort(scores, decreasing=T)
+```
+
+Next, we can retrieve the gene set information from MSigDB using the `msigdbr` package mentioned above, and generate the gene set list for `fgsea`. Let's focus on the C8 category of gene sets, which are the cell type signature gene sets.
+```R
+library(msigdbr)
+genesets_celltype <- msigdbr(species = "Homo sapiens", category = "C8")
+genesets_celltype_list <- tapply(genesets_celltype$ensembl_gene, genesets_celltype$gs_name, list)
+
+library(fgsea)
+fgsea_kegg <- fgsea(pathways = genesets_celltype_list,
+                    stats = scores_ordered,
+                    minSize  = 15,
+                    maxSize  = 500)
+```
 
 ### 3-7 Other analysis
 <sub><a href="#top">(Back to top)</a></sub></br>
