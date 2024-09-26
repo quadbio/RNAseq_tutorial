@@ -1,13 +1,14 @@
 # Tutorial for bulk RNA-seq data preprocessing and analysis
 #### Compiled by Zhisong He
-#### Updated on 19 Sept 2022
+#### Updated on 26 Sept 2024
 ### Table of Content
   * [Introduction](#introduction)
   * [Preparation](#preparation)
     * [1-1. Linux and Bash, your important buddies for RNA-seq data analysis](#1-1-linux-and-bash-your-important-buddies-for-rna-seq-data-analysis)
     * [1-2. Access the computing server](#1-2-access-the-computing-server)
-    * [1-3. Install the required tools with the help from conda](#1-3-install-the-required-tools-with-the-help-from-conda)
-    * [1-4. Get the public RNA-seq data from SRA](#1-4-get-the-public-rna-seq-data-from-sra)
+    * [1-3. Using a computer cluster like Euler](#1-3-using-a-computer-cluster-like-euler)
+    * [1-4. Install the required tools with the help from conda](#1-4-install-the-required-tools-with-the-help-from-conda)
+    * [1-5. Get the public RNA-seq data from SRA](#1-5-get-the-public-rna-seq-data-from-sra)
   * [Preprocessing of RNA-seq data](#preprocessing-of-rna-seq-data)
     * [2-1 Quality control of RNA-seq data](#2-1-quality-control-of-rna-seq-data)
     * [2-2 Read mapping/pseudomapping and quantification](#2-2-read-mappingpseudomapping-and-quantification)
@@ -39,8 +40,9 @@ In the following sections, we will go through the steps of RNA-seq data preproce
 In this section, I will discuss basics before we even start preprocessing the RNA-seq data, so that you can make sure that you and your computer are both ready for the following steps. These basics include the following:
 1. Linux and [Bash (the Bourne Again SHell)](https://www.gnu.org/software/bash/), the most commonly used command line interface in Linux
 2. How to access a computing server via SSH
-3. Conda and how to use it to install software needed for the data preprocessing
-4. SRA and how to retrieve public RNA-seq data from there
+3. How to use an HPC like Euler
+4. Conda and how to use it to install software needed for the data preprocessing
+5. SRA and how to retrieve public RNA-seq data from there
 
 ### 1-1. Linux and Bash, your important buddies for RNA-seq data analysis
 <sub><a href="#top">(Back to top)</a></sub></br>
@@ -240,11 +242,12 @@ ssh <username>@<hostname>
 
 Here you would need to make sure you have a username or account name available at the server, so as the name of the server (hostname). Also you need to make sure that your personally computer and the server is in the same network (e.g. to use the servers in ETHZ, you should make sure you are using the ETH network via WIFI or network cables in the campus, or you should use the ETH VPN), otherwise the computer won't be able to understand and connect to the right machine. Without other additional setup, the server will then respond by asking you for the password. If the server is working, your account is valid on the server, and the username and password you input match, you can likely see some welcoming message, and a new line with the prompt waiting for your command in the server.
 
-For the students attending the Systems Genomics course, there is the student server for you to work on your drylab task. The server is called "bs-studentsvr04" as its hostname. The username to login the server is your ETH username, while the password being the one you use also for your email and most of the ETH services.
-
 ```console
 ssh <username>@bs-studentsvr04
 ```
+
+>***NOTE***
+>For the Systems Genomics lecture, we used to have a dedicated student server called 'bs-studentsvr04' for students joining the lecture to use for preprocessing the data. The server, however, is no longer valid and for the lecture we have now completely switched to Euler, the high-performance computer cluster in ETH. More details will be provided in the next section. Still, this section is relevant, as using Euler firstly requires the access to the login server of the system, for which you will use the way as described here.
 
 You would hopefully see the following, suggesting a successful login:
 <p align="center">
@@ -261,19 +264,76 @@ The PuTTY app has a GUI as following:
 <img src="img/PuTTY.png"/>
 </p>
 
-The simplest and fastest way to start with is to put in the hostname of the server (bs-studentsvr04 for the student server for the Systems Genomics course), and then click on the "Open" button or type the Enter key directly, and it would open a terminal-like window where there is the text asking you to type in your username. Type in your username followed by Enter to input, it would then ask for your password. Enter your password, and if everything is alright, you will see things basically the same as the `ssh` example, suggesting a successful login.
+The simplest and fastest way to start with is to put in the hostname of the server, and then click on the "Open" button or type the Enter key directly, and it would open a terminal-like window where there is the text asking you to type in your username. Type in your username followed by Enter to input, it would then ask for your password. Enter your password, and if everything is alright, you will see things basically the same as the `ssh` example, suggesting a successful login.
 
 >***NOTE***
->For some advanced Windows users, you may have heard of or been using the WSL (Windows Subsystem for Linux) system. Microsoft developed a compatibility layer for running Linux binary executables natively on a Windows system, and it is available in Windows 10 and Windows 11. From 2019, there is the MSL2 announced which introduced a real Linux kernel. It also supports different Linux distributions including Ubuntu, OpenSUSE and some others. If you have WSL in your Windows computer, you don't need to use PuTTY in principle, as you should directly have `ssh` installed as a part of your WSL. In that case, what you need to do is to simply open the WSL (e.g. search for Ubuntu in the start menu if that's the one you have), and then run `ssh` directly just as in macOS or Linux.
+>For some advanced Windows users, you may have heard of or been using the WSL (Windows Subsystem for Linux) system. Microsoft developed a compatibility layer for running Linux binary executables natively on a Windows system, and it is available in Windows 10 and Windows 11. It also supports different Linux distributions including Ubuntu, OpenSUSE and some others. If you have WSL in your Windows computer, you don't need to use PuTTY in principle, as you should directly have `ssh` installed as a part of your WSL. In that case, what you need to do is to simply open the WSL (e.g. search for Ubuntu in the start menu if that's the one you have), and then run `ssh` directly just as in macOS or Linux. Though, one thing you have to keep in mind is that WSL, particularly the current WSL2, has a known general issue of lossing network connection when a VPN is on. This becomes a big issue when you want to use it for the System Genomics lecture as you would very likely need to turn on the ETH VPN all the time. There are two solutions I would recommend. One is to use other methods, such as PuTTY as mentioned earlier. The second one is to follow the following two pages to fix the [DNS](https://superuser.com/questions/1630487/no-internet-connection-ubuntu-wsl-while-vpn) and [VPN connection](https://github.com/sakai135/wsl-vpnkit?tab=readme-ov-file) issues. The second method has been tested and does work.
 
 No matter in which way, once you login the server successfully, you are ready to play around with it a bit with what have been shown above, and then continue to the next section.
 
-#### More information about the bs-studentsvr04 server
+### 1-3. Using a computer cluster like Euler
+A computer cluster is a set of computers that work together so that they can be viewed as a single system (from Wikipedia). It consists of many 'node', each being a computer which can execute computing tasks independently. All the nodes are controlled and scheduled by software (job schedulers). Compared to using the single computing server, while it is possible to run a command/script/program directly just as one would easily do, it is hihgly unrecommended and in many cases, prohibited. Instead, one should use the job scheduler by submitting the computing task to it, together with the computational resources (maximal running time, number of CPU cores, amount of RAM, number of GPU, etc.) one would like to request for the task. The way to use the job scheduler depends on which job scheduler is used by the cluster. Common job schedulers include SLURM, Spectrum LSF, Oracle Grid Engine (SGE).
+
+In ETH Zurich, the scientific IT services provide scientific computing services to all ETH Zurich members. Among those services there is the Euler, the central HPC (high-performance computing) cluster of ETH. It is a very powerful computer cluster which includes more than 1,000 compute nodes and large volumns of storages. All ETH Zurich members including students can use it freely. It has a [wikipage](https://scicomp.ethz.ch/wiki/Euler) which includes all the detailed information (including tutorials of using the cluster) of Euler. Here, we will give a very brief introduction of how to use it.
+
+First of all, you need to login the system via its login node. Do it with `ssh` at your terminal, or PuTTY if you are a Win user, or any other method mentioned or not mentioned above, to the server login address `euler.ethz.ch`, given your ETH username. Make sure you are in the ETH network when doing so (with ETH VPN on or with the WIFI/cable connection in ETH). 
+```console
+ssh <username>@euler.ethz.ch
+```
+
+The login node looks very similar to a typical Linux server. However, its function is to provide access to the cluster and its job scheduler instead of doing computation by itself. There are some operations that you can do it directly at the login node, including installing your conda, setting up your conda environment, downloading your data, or even running a small and quick example code with very little memory and CPU resources in need. Any other operation which could take very long and require lots of resource should not be run directly. Instead, you should submit the task or command to its job scheduler. For that, Euler uses SLURM. In the wikipage of Euler, there is a [page](https://scicomp.ethz.ch/wiki/Using_the_batch_system) giving a brief but comprehensive overview and introduction of how to use SLURM in Euler. In short, you can submit a command to the system as:
+```console
+sbatch --time=23:30:00 --ntasks=10 --mem-per-cpu=5G --wrap='STAR --runThreadN 10 --runMode genomeGenerate --genomeDir star-index --genomeFastaFiles hg38.fa'
+```
+
+What it means here is to submit a command, which is specified by the `--wrap` option to be `STAR --runThreadN 10 --runMode genomeGenerate --genomeDir star-index --genomeFastaFiles hg38.fa` in this example (as you will find out later in this tutorial, it is to build the index for the hg38 human reference genome for STAR mapping). At the same time, it requests a maximal running time of 23 hours 30 minutes, 10 CPUs and each CPU with 5G of RAM (so in total 50GB of memory). You should make sure that the requested running time, the number of CPUs and the total RAM is sufficient for your task, otherwise it will be killed automatically by the system.
+
+And, there is another way to submit a task. You can create a script file to specify the requested resource and the command to run. The script looks like this:
+```console
+#!/bin/bash
+
+#SBATCH --ntasks=10
+#SBATCH --time=23:30:00
+#SBATCH --mem-per-cpu=5G
+
+cd /cluster/scratch/<username>/
+STAR --genomeDir genome/star-index \
+     --runThreadN 10 \
+     --readFilesIn rawdata/SRR2815952.fastq.gz \
+     --readFilesCommand zcat \
+     --outSAMtype BAM SortedByCoordinate \
+     --outFileNamePrefix mapping/SRR2815952/
+```
+>***NOTE***
+>Here, we again request 10 CPUs, each with 5G of RAM, for maximal 23 hours 30 minutes, and it is to run the STAR mapping, which you can find more details later in this tutorial.
+
+Next, we should submit this script to the job scheduler. Assume the script is called `do_mapping.sh`, do `sbatch do_mapping.sh`.
+
+Once your job is submitted, you are able to track its status with `squeue` at the Euler login node. It will give the output similar to this example as provided in the Euler tutorial:
+```console
+[sfux@eu-login-41 ~]$ squeue
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+           1433323 normal.4h     wrap     sfux  PD      0:04      1 eu-g1-026-2
+           1433322 normal.4h     wrap     sfux  R       0:11      1 eu-a2p-483
+```
+The ST column shows the running status. PD is for pending meaning the job is still in the queue and not yet started. R means it is currently running. You can also find the job ID for each job. If you suddently realize the task is not supposed to run, you can remove it with the `scancel` command, as
+```console
+scancel 1433323
+```
+Of course, here you should replace 1433323 with the actual job ID of the job that you want to kill.
+
+The waiting time of a job to start depends on many factors, including how much resources are currently available in the cluster (and whether they are sufficient for your task), how many tasks are currently at the queue, and importantly, your priority level. While the cluster can indeed be used freely by all ETH Zurich members, different users may have different priorities depending on the share you have. All members are under the 'public share', but there are professors who finance one or more computing nodes (they are shareholders of Euler) which give higher priorities to people in their labs. In that case, people with only public share may have to wait until tasks from users with higher priorities are clear so that their tasks can start. Practically, it implies that starting the job in the evening can potentially results in shorter waiting time. Or, if you have a shareholder status then you won't have any limitation until the amount of resources covered by your share is done.
+
+And in theory, you can submit all the tasks (e.g. the mapping of every sample) in parallel so that they can potentially be run altogether. This strategy works pretty well when you hold a share which grant you a higher user priority. Otherwise, you may have long waiting time for every task you submit, and in the end, it may be even faster to submit all the processing in one task (with longer running time requested).
+
+Another important issue to keep in mind about Euler is the storage. For users with only public share, there are only two storages one can use, each with its own limitations:
+1. Home storage (`/cluster/home/<username>`). It is 45GB max, and should have no more than 450k files in total. It is for long term storage so files stored there would not be erased unless you delete them. You can put, for example, the software you need, or your conda, there.
+2. Scratch storage (`/cluster/scratch/<username>`). It is much bigger (everyone has 2.5 TB and max 1 million files quota) and optimized for data access at the compute node. However, it is a short term storage and files older than 15 days will be automatically deleted. It is usually used to store the data for processing but you would have to make sure that the processing has to be done in two weeks.
 
 
-### 1-3. Install the required tools with the help from conda
+### 1-4. Install the required tools with the help from conda
 <sub><a href="#top">(Back to top)</a></sub></br>
-Now you have access to the server, and hopefully also know something about how to use it via command line. Now it's time to set up all the tools needed for the following data preprocessing and analysis. Here I summarize some software which will be introduced and/or used later.
+Now you have access to the server/cluster, and hopefully also know something about how to use it via command line. Now it's time to set up all the tools needed for the following data preprocessing and analysis. Here I summarize some software which will be introduced and/or used later.
 
 |Software|Link|Function|Compatible OS|
 |--------|----|--------|-------------|
@@ -293,7 +353,6 @@ The SRA Run Selector is a webtool that you can simply access using your browser 
 Some of those tools do not require too much effort to set up. They are either implemented with a cross-platform programming language (e.g. Java), or pre-compiled using the same or compatible system as the system used in the server. For those software, you can directly download it from the website to somewhere in the server (e.g. with `wget`), decompress it if needed (e.g. with `unzip` for .zip files, `gzip` for .gz files, `tar` for .tar, .tar.gz and .tar.bz files), and then there is the executable file available to run. This category includes FastQC (Java-based) and SRA-Toolkit (pre-compiled).
 
 ```console
-cd [the students folder]
 mkdir tools
 cd tools
 wget https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.9.zip
@@ -312,17 +371,14 @@ Luckily, now we have conda.
 To use conda, we need to firstly install conda in the server. We can download miniconda, a free minimal installer for conda, to the server, and then run it. More information about miniconda can be found here: https://docs.conda.io/en/latest/miniconda.html.
 
 ```console
-cd [the students folder]
-cd tools
-wget https://repo.anaconda.com/miniconda/Miniconda3-py37_4.12.0-Linux-x86_64.sh
-bash Miniconda3-py37_4.12.0-Linux-x86_64.sh
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh
 ```
-
 And then simply follow the prompts on the screen. 
 
 >**TIPS**
 >* During the installation of miniconda, you will be asked to read through the "End User License Agreement" and confirm. Obviously that's not a short document that you can see in one screen. You can type Enter to every time go one line forward and carefully read it through, or press F to do page-down scrolling to reach the end quickly. Be aware that the default answer is "no" for disagreeing with the document and then the installation will be quit, so do answer "yes" when you are asked.
->* By default the miniconda program will be installed to your home folder (usually `/home/[your username]/miniconda3`). However, if you are using the bs-studentsvr04 for the Systems Genomics course, you should change it to your scratch folder (`/local0/students/[your username]`). Make sure that folder is created already. If not, create it with the `mkdir` command (`mkdir /local0/students/[your username]`). The similar priciple usually applies to many other computing servers as well, where limitations are set to how much data and/or file numbers you can store in the home folder.
+>* By default the miniconda program will be installed to your home folder. You can change it if you want or if it is necessary.
 >* The last step of the installation asks you whether to run `conda init` right after. The default is "no" but here I would recommend to answer "yes". Otherwise, you shall run `conda init` by yourself after the installation is done.
 
 Once the installation is done, you shall quit the login session to the server, and then log in it again. Afterwards, you can check whether the conda is successfully installed and set up by simply checking where your Python interpreter is.
@@ -344,20 +400,23 @@ your conda is either not installed successfully, or not yet properly initialized
 And once you have the conda installed and set up, it would be just one command to have the remaining tools installed.
 
 ```console
-conda install -c bioconda -c conda-forge cutadapt star kallisto samtools rsem
+conda install --solver=libmamba -c conda-forge -c bioconda cutadapt star kallisto samtools rsem
 ```
 
 Indeed, you can install FastQC, SRA-Toolkit and FASTX-Toolkit also with conda
 ```console
-conda install -c bioconda -c conda-forge fastqc sra-tools fastp
+conda install --solver=libmamba -c conda-forge -c bioconda fastqc sra-tools fastp
 ```
+
+>***NOTE***
+>The `--solver=libmamba` option tells conda to use the libmamba solver which is implemented in C and much faster than the classical conda solver for the environment.
 
 It would ask you to confirm the installation of not only the four requested software but also all the dependencies. Once everything is finished, you can use the `which` command to make sure those tools are installed (e.g. `which STAR`).
 
 >**NOTE**
 >Conda has more functionalities that just installing software more easily. It is an environment manager, meaning that you can create, manage, delete and use different environment where different software are installed while making sure those different environments would not affect each other. This is especially useful when you want to use certain versions of software in some scenarios but not the others. Having too many software installed in the same environment also makes it more difficult and time-consumping to resolve the dependencies when installing new packages or upgrading the existing ones. Therefore, to have different environments set up for different purposes could be a very useful guideline in the future.
 
-### 1-4. Get the public RNA-seq data from SRA
+### 1-5. Get the public RNA-seq data from SRA
 <sub><a href="#top">(Back to top)</a></sub></br>
 Now we have the computational environment ready for the preprocessing. We just need to data to start. As one can easily expect, there are two sources of data: the in-house data that are generated freshly by the lab for specific biological questions, and the public data which have been released and used for answer certain questions, but can be reanalyzed solely or together with other data for the same or related questions.
 
@@ -450,24 +509,29 @@ Now we can select those samples from the SRA Run Selector. After selecting only 
 #### Download the raw sequencing data in FASTQ format via SRA-Toolkit
 Now it is time to download the data. As mentioned above, SRA-Toolkit provides the functionalities to download data from SRA, given the list of SRA sequencing run accessions which we just obtained. And of course, we would like to do the download directly on the machine that will be used for the following preprocessing (e.g. the bs-studentsvr04 server). Since you probably just downloaded the accession list to your personal computer, you need to upload it to the machine. There are different options for that.
 
-You can just copy-paste the content of the accession list file. Open the accession list by any text editor on your computer, select all the context and then copy, and then login the server, go to your work folder (e.g. [the students folder]), and then create to paste all the content. For instance, you can use nano by `nano SRR_Acc_List.txt` to create the file "SRR_Acc_List.txt", then in the editor paste the text just copied with cmd+C for macOS or right-click at the PuTTY window if you are a Windows PuTTY user. After seeing all the accession numbers being pasted to nano, press ctrl+X (as indicated at the footnote menu, `^X Exit`. The character ^ in front of a Latin alphabet means pressing both the ctrl button and the other character button at the same time) for exit, and then press `Enter` to confirm the saving.
+You can just copy-paste the content of the accession list file. Open the accession list by any text editor on your computer, select all the context and then copy, and then login the server, go to your work folder (e.g. [the scratch folder]), and then create to paste all the content. For instance, you can use nano by `nano SRR_Acc_List.txt` to create the file "SRR_Acc_List.txt", then in the editor paste the text just copied with cmd+C for macOS or right-click at the PuTTY window if you are a Windows PuTTY user. After seeing all the accession numbers being pasted to nano, press ctrl+X (as indicated at the footnote menu, `^X Exit`. The character ^ in front of a Latin alphabet means pressing both the ctrl button and the other character button at the same time) for exit, and then press `Enter` to confirm the saving.
 
 Alternatively, you can directly transfer the file to the server. This sounds overkilling in this case but it is good to know how to do it as you may need to copy something much bigger to the server. For most of the servers supporting SSH access, it also supports data transfer via SFTP (Secure FTP, or File Transfer Protocol), or the `scp` command mentioned above if your personal computer is on macOS or Linux. The way of using `scp` is very similar to `cp`. The only difference is that you need to include your username and the hostname of the remote machine in the file name so that the command knows that the file source or target is at a remote computer. For example,
 
+The same principle also applies to the Euler cluster.
+
 ```console
-scp Downloads/SRR_Acc_List.txt hezhi@bs-studentsvr04:/mnt/users/hezhi
+scp Downloads/SRR_Acc_List.txt hezhi@euler.ethz.ch:/cluster/scratch/hezhi
 ```
-In this case, the command will then ask for the password for logging in the bs-studentsvr04 machine with the username hezhi (this is my username. Don't forget to change it to yours). Type in the matched password (the same password as when logging in via ssh), and then the transfer will start, and the new copy will be at the `/mnt/users/hezhi` directory in the bs-studentsvr04 server.
+In this case, the command will then ask for the password for logging in the Euler login node with the username hezhi (this is my username. Don't forget to change it to yours). Type in the matched password (the same password as when logging in via ssh), and then the transfer will start, and the new copy will be at the `/cluster/scratch/hezhi` directory in the Euler cluster, which is my scratch folder.
 
 Once you get the accession list in the server, you can do the data download using SRA-Toolkit. The toolkit contains many different commands. Among them the most relevant ones include `prefetch`, `fastq-dump` and `fasterq-dump`. The `prefetch` commands can take a accession list file as the input and download the data of those accessions in the format of [SRA data format](https://www.ncbi.nlm.nih.gov/sra/docs/sra-data-formats/) which the SRA repository uses to store sequencing data. It is however not the standard data format of sequencing data that any genomic data processing tool will use. One can then use the `fastq-dump` command to convert the SRA files to the standard data format FASTQ, given all the downloaded SRA files with the glob pattern. 
 
 ```console
-cd [student folder]
+cd [the scratch folder]
 mkdir rawdata
 cd rawdata
 prefetch --option-file ../SRR_Acc_List.txt
 fastq-dump --gzip --split-3 SRR*/*.sra
 ```
+
+>***NOTE***
+>In Euler, you can also change your current working folder to your scratch folder via `cd $SCRATCH`. The environmental variable `$SCRATCH` stores the location of your scratch folder.
 
 >**NOTE**
 >* The `prefetch` command saves the downloaded data of each sequencing run (i.e. every unique SRR accession) in a separated directory named by the SRR accession.
@@ -487,6 +551,9 @@ This is a bit annoying as we don't want to type in many SRR accession numbers on
 cat ../SRR_Acc_List.txt | xargs fasterq-dump --threads 5 --progress
 gzip *.fastq
 ```
+
+>***NOTE***
+>The `fasterq-dump` command firstly downloads the data in the SRA format and stores at the home folder. Due to the limitations on home storage in Euler, this step may fail when your home storage quota is gone (you can check with `lquota ~` at the Euler login node). In that case, you have several options. One is to swtich to use `prefetch`+`fastq-dump`. Option two is to do the download at your own computer and then transfer the data to Euler similar to when transferring the SRR accession list. Option three is to split the accession list into several pieces, and every time run fasterq-dump on one piece and make sure to delete the SRA files from the previous run before starting the next piece.
 
 Once the download is finished, you can list the files in your working directory and see whether you can all the files as expected. They should all be named as [SRR Accession].fastq.gz.
 
@@ -562,7 +629,7 @@ Other quality metrics are more related to the sample and cDNA library quality. F
 
 To run it in the command line, it is very simple. This is an example:
 ```console
-cd [student folder]
+cd [the scratch folder]
 cd rawdata
 mkdir fastqc
 fastqc -o fastqc *.fastq.gz
@@ -596,7 +663,7 @@ For the example shown in the screenshot above, we don't need to do anything as i
 **IMPORTANT NOTE**: It is not always necessary to do anything here even if problems were found, especially those related to base quality. For instance, many up-to-date software being used later for read mapping (e.g. STAR) has implemented a soft trimming mechanism to deal with low-quality bases at the end of a read.
 
 #### (Optional) Trimming and deduplication
-If it is really needed, fixing the first and the third problems requires cutting off parts of some/all reads in the data. There are quite some tools providing the functionality to do that, including [Cutadapt](https://cutadapt.readthedocs.io/en/stable/index.html) and [fastp](https://github.com/OpenGene/fastp). The fastp tool, although less famous and commonly used than Cutadapt, provides the de-duplication function altogether so that one can do trimming+deduplication at the same time.
+**If it is really needed**, fixing the first and the third problems requires cutting off parts of some/all reads in the data. There are quite some tools providing the functionality to do that, including [Cutadapt](https://cutadapt.readthedocs.io/en/stable/index.html) and [fastp](https://github.com/OpenGene/fastp). The fastp tool, although less famous and commonly used than Cutadapt, provides the de-duplication function altogether so that one can do trimming+deduplication at the same time.
 
 Let's firstly look at Cutadapt. It has a lot of functionalities related to do all kinds of trimming in pretty complicated manners. You can get all the details from its [online user guide](https://cutadapt.readthedocs.io/en/stable/guide.html). As an easy example, assuming the data being single-ended (SE), we can trim the adapter sequences in the data by using the following command:
 ```console
@@ -632,6 +699,10 @@ for file in *.fastq.gz; do
   fastp --dedup --adapter_sequence AGATCGGAAGAG -l 25 -i $file -o trimmed_dedup/$file
 done
 ```
+
+>***NOTE***
+>* If you use Euler, you can either put the whole for loop into the script file to submit with `sbatch` (i.e. the loop to run the processing for samples sequentially is submitted as one task), or replace the command inside of the for loop by the `sbatch` command to submit that command into the queue (i.e. every individual processing of one sample will be submitted as separated tasks). As mentioned earlier in the Euler section, the first option will likely resulted in shorted waiting time if you don't have a high priority account, while the second option will hopefully result in shorter running time if all your tasks can be indeed run together at the same time.
+>* And, if you use conda for the tools, make sure you have the conda environment being activated before submitting the task, so that the system can actually localize the software. You can simply check whether the command is available before running `sbatch`, with e.g. `which fastp`. It should output the full path of the command if the system finds it. Otherwise, you get nothing.
 
 Also to keep in mind that fastp is able to do more complicated manipulations and examples are shown in its [github page](https://github.com/OpenGene/fastp). It also provides a QC summary, not as comprehensive as FastQC does but still reasonable. However, we won't go into those details in this tutorial.
 
@@ -674,11 +745,14 @@ In the download page, data are grouped by species in mostly alphabetical order, 
 
 So now you can choose to download the file directly to your computer, and then transfer it to the server using the methods mentioned above (`scp` or SFTP), or directly download the data to the server. For the latter, you can use the `wget` command:
 ```console
-cd [student folder]
+cd [the scratch folder]
 mkdir genome
 cd genome
 wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
 ```
+
+>***NOTE***
+>In Euler, you can do the download directly without using `sbatch`.
 
 >**NOTE**
 >The UCSC Genome Browser is not the only place to download genomes. There are other databases:
@@ -693,6 +767,9 @@ STAR expects decompressed FASTA file(s) for the reference genome, so you shall d
 ```console
 gzip -d hg38.fa.gz
 ```
+
+>***NOTE***
+>If you use Euler, this `gzip` is a bit in the grey zone in between what you must submit to the job queue and what you can for sure run directly at the login node without any problem. Make the decision based on which you think is more acceptable: strictly following the rule but having to wait even for such a small step, or getting it done quickly but taking the risk of getting complains from the Euler team and (in the worst case) being warned or even blocked.
 
 Now we can build the genome index of the human reference genome for STAR
 ```console
@@ -719,10 +796,13 @@ Sep 01 13:08:08 ... writing SAindex to disk
 Sep 01 13:08:14 ..... finished successfully
 ```
 
+>***NOTE***
+>In Euler, the genome index should be done by submitting the task with `sbatch`. The example code is already shown in the Euler section.
+
 #### Mapping with STAR
 Once the genome indexing is done, you are ready to map the reads to the reference genome with STAR. STAR has pretty good default mapping-related parameter settings, therefore, they can be kept as default for most ordinary RNA-seq data sets. Parameters that always need to be set properly are those related to the input and output files. This is the basic example script to run STAR on one of the sample in the example data set (no hurry to run, there is more to come :wink:):
 ```console
-cd [student folder]
+cd [the scratch folder]
 mkdir mapping
 mkdir mapping/SRR2815952
 STAR --genomeDir genome/star-index \
@@ -832,7 +912,7 @@ In general, you can get the gene annotation file from the same database where yo
 
 So here, we can download the human gene annotation in GTF format from the newest GENCODE, and then rewrite the STAR command to let it do the counting as well:
 ```console
-cd [student folder]
+cd [the scratch folder]
 wget -O genome/gencode.v41.annotation.gtf.gz https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/gencode.v41.annotation.gtf.gz
 gzip -d genome/gencode.v41.annotation.gtf.gz
 mkdir mapping_count
@@ -874,7 +954,7 @@ And the tool [RSEM](https://bmcbioinformatics.biomedcentral.com/articles/10.1186
 
 Now let's further modify our script to run STAR:
 ```console
-cd [student folder]
+cd [the scratch folder]
 mkdir mapping_transcriptome
 mkdir mapping_transcriptome/SRR2815952
 STAR --genomeDir genome/star-index \
@@ -889,7 +969,7 @@ STAR --genomeDir genome/star-index \
 
 Now we can run RSEM given the transcriptome aligned BAM by STAR, though we need to make an RSEM index for the genome plus annotation first
 ```console
-cd [student folder]
+cd [the scratch folder]
 mkdir genome/rsem_hg38_gencode41
 rsem-prepare-reference --gtf genome/gencode.v41.annotation.gtf \
     genome/hg38.fa \
@@ -898,7 +978,7 @@ rsem-prepare-reference --gtf genome/gencode.v41.annotation.gtf \
 
 Finally we can get it done.
 ```console
-cd [student folder]
+cd [the scratch folder]
 mkdir rsem
 mkdir rsem/SRR2815952
 rsem-calculate-expression --alignments \
@@ -928,7 +1008,7 @@ The first column is the gene ID, and the second column shows all the isoforms th
 #### Applying the whole STAR procedure to all samples
 All the above are for the mapping and RSEM gene expression quantification of one sample. We can now wrap everything up into one Bash script to apply the procedure to all samples one-by-one.
 ```console
-cd [student folder]
+cd [the scratch folder]
 
 if [ ! -e mapping_transcriptome ]; then
   mkdir mapping_transcriptome
@@ -937,6 +1017,55 @@ if [ ! -e rsem ]; then
   mkdir rsem
 fi
 
+for id in `cat SRR_Acc_List.txt`; do
+  echo "start to process sample $id"
+  if [ ! -e mapping_transcriptome/$id ]; then
+    echo "  mapping started"
+    mkdir mapping_transcriptome/$id
+    STAR --genomeDir genome/star-index \
+         --runThreadN 10 \
+         --readFilesIn rawdata/${id}*.fastq.gz \
+         --readFilesCommand zcat \
+         --sjdbGTFfile genome/gencode.v41.annotation.gtf \
+         --quantMode TranscriptomeSAM \
+         --outSAMtype BAM SortedByCoordinate \
+         --outFileNamePrefix mapping_transcriptome/$id/
+    echo "  mapping done"
+  fi
+  
+  if [ ! -e rsem/$id ]; then
+    echo "rsem started"
+	mkdir rsem/$id
+    num_fa=`ls -1 rawdata/${id}*.fastq.gz | wc -l`
+    if [ $num_fa -eq 1 ]; then
+      rsem-calculate-expression --alignments \
+                                -p 10 \
+                                mapping_transcriptome/$id/Aligned.toTranscriptome.out.bam \
+                                genome/rsem_hg38_gencode41/rsem_hg38_gencode41 \
+                                rsem/$id/$id
+    else
+      rsem-calculate-expression --alignments \
+                                --paired-end \
+                                -p 10 \
+                                -q \
+                                mapping_transcriptome/$id/Aligned.toTranscriptome.out.bam \
+                                genome/rsem_hg38_gencode41/rsem_hg38_gencode41 \
+                                rsem/$id/$id
+    fi
+    echo "  rsem done"
+  fi
+done
+```
+
+In Euler, similar to what has been mentioned, you can either put the whole for loop into a script file and submit it as one single task to Euler to minimize the waiting time (make sure to request enough running time), or make the for loop to generate a script file for each sample and submit a task of every individual sample (be prepared if you have to wait long). The following is an example script file for the option-1. Be aware that you may have to adjust the requested maximal running time and other parameters.
+```console
+#!/bin/bash
+
+#SBATCH --ntasks=10
+#SBATCH --time=23:30:00
+#SBATCH --mem-per-cpu=5G
+
+cd $SCRATCH
 for id in `cat SRR_Acc_List.txt`; do
   echo "start to process sample $id"
   if [ ! -e mapping_transcriptome/$id ]; then
@@ -1007,7 +1136,7 @@ In brief, kallisto indexes the reference transcriptome as a graph of k-mers (all
 
 Before running kallisto for the pseudoalignment, the reference transcriptome needs to be indexed. There are two options here. Kallisto provides [the transcriptome index for some commonly used species](https://github.com/pachterlab/kallisto-transcriptome-indices/releases), based on their annotations in Ensembl. This is not the newest Ensembl version, and the species you look at may not be available here, but it is fast and safe. The other option is to build the index by ourselves. In that case we need to obtain the FASTA file of the reference transcriptome. For species that's available in UCSC or Ensembl genome browser, they provide download of the reference transcriptome sequences in FASTA file. For human and mouse, the reference transcriptome sequences are also available in GENCODE, and same applies to FlyBase for fruit fly, and WormBase for roundworm. Here for the example data set here, let's download the human transcript sequences from GENCODE, and then build the kallisto index.
 ```console
-cd [student folder]
+cd [the scratch folder]
 mkdir transcriptome
 cd transcriptome
 wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/gencode.v41.transcripts.fa.gz
@@ -1017,7 +1146,7 @@ kallisto index -i kallisto_index/hg38_gencode41 gencode.v41.transcripts.fa.gz
 
 Once the transcriptome index is done, we can start the pseudoalignment using kallisto to the transcriptome.
 ```console
-cd [student folder]
+cd [the scratch folder]
 mkdir kallisto
 mkdir kallisto/SRR2815952
 kallisto quant -i transcriptome/kallisto_index/hg38_gencode41 \
@@ -1038,7 +1167,7 @@ In the kallisto output folder, we can see the output files. The file `abundance.
 
 Now, similar to what we did for the STAR mapping plus RSEM estimation of TPM, we can write a Bash script to run kallisto to each sample one-by-one:
 ```console
-cd [student folder]
+cd [the scratch folder]
 
 if [ ! -e kallisto ]; then
   mkdir kallisto
@@ -1109,11 +1238,12 @@ Here are some resources for learning R, that you can find online:
 * [R Graphics Cookbook](https://r-graphics.org/), about the graphics features of R, especially with ggplot2, the widely used visualization framework in R which was originally created by Hadley Wickham in 2005 to implement "The Grammar of Graphics"
 * [Ten simple rules for teaching yourself R](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1010372), an article at the education section of PLOS Computational Biology
 
-In the bs-studentsvr04 server, R (4.2.1) has been installed and can be used directly. Indeed, during your installation of the tools with conda, your conda environment should also have an R installed, so there would be at least two different Rs you can use.
+You can check whether R is available in your environment by doing `which R`. If it is not there, you can ask the system admin to install one for you; or you install one by yourself (with conda `conda install -c conda-forge r-base`, though not very recommended as you may have to deal with quite a lot of version conflict and basic package installation; with by compiling the R from source codes); or if you use Euler, there is a R module that you can load with `module load stack r`.
 
 >**NOTE**
->* If your conda base environment is set to be automatically on (this is the default after running `conda init`), you would have the R in your conda as the default one, and can be run by typing `R` in CLI. If you want to use the one installed in the system, your can either do `/usr/local/bin/R`, or you shall run `conda deactivate` first to deactivate your conda environment, and then run `R`. Just be aware that you won't be able to use the tools installed with conda after that, unless you start a new login session, or run `conda activate base` to activate the base conda environment again
->* Since running the following analysis should require less memory, it is in principle possible to just use your personal computer. If you want to do that, installing R at your personal computer is also not complicated. Just visit the [R website](https://www.r-project.org/), go to the download page, choose a mirror server that fits you the most (or just the first one "0-Cloud" if you don't want to spend the effort), then click on the link for the installer on your OS.
+>* R has two different ways to run. One is the interactive interface (via `R` in the terminal) which is in most of the time the way people use. The alternative way is to use `Rscript` to directly run through the R codes in a script file.
+>* For doing analysis as following, of course it would be ideal to use the interative interface. However, this is not what Euler really wants.
+>* Since running the following analysis should require less memory, it is in principle possible to just use your personal computer. If you want to do that, installing R at your personal computer is also not complicated. Just visit the [R website](https://www.r-project.org/), go to the download page, choose a mirror server that fits you the most (or just the first one "0-Cloud" if you don't want to spend the effort), then click on the link for the installer on your OS. 
 >* Although installing R is quite simple, installing additional R packages could be quite painful as many require additional compiling process. Particularly for the Windows users, Windows doesn't natively support the compiling from source code. Therefore, besides R, you also need [RTools](https://cran.r-project.org/bin/windows/Rtools/) which provides the tools in Windows for building R packages from source.
 
 #### RStudio
@@ -1121,13 +1251,8 @@ There are two ways of using R. One is to write all the R script in a file, and t
 
 This is what [RStudio](https://www.rstudio.com/) brings you. It is an integrated development environment (IDE) for R, which includes a console (basically the native R CLI interface), syntax-highlighting editor that supports direct code execution (this is a great feature), as well as tools for plotting, history, debugging and workspace management. It is available in two formats: RStudio Desktop is a regular desktop application while RStudio Server runs on a remote server and allows accessing RStudio using a web browser. Note that RStudio doesn't include R itself, so you shall make sure R is installed in the machine, so that your RStudio can call the installed R for running the codes.
 
-In the bs-studentsvr04 server, there is an RStudio server installed and bound to R in the system (`/usr/local/bin/R`). To use it, you shall firstly make sure that your personal computer has connected to the ETH network. Then you can visit the following link in your browser (e.g. Google Chrome): http://bs-studentsvr04:8788/. It should lead you to the login page of the RStudio server there.
-<p align="center"><img src="img/rstudio_server_login.png" /></p>
-
-Then, enter the same username and password as you use for SSH login to the server. Once it is approved, you will see the RStudio server window.
-<p align="center"><img src="img/rstudio.png" /></p>
-
-Now you can create a new R script file by clicking the <img src="img/new_r_script.png"> button, and start to write R script there. You can easily execute the line you write with Ctrl+Enter.
+>***NOTE***
+>Of course you also have alternatives besides the basic R interactive environment and Rstudio. For example, there is Jupyter Notebook and JupyterLab, which is a part of the [Project Jupyter](https://en.wikipedia.org/wiki/Project_Jupyter) aiming to provide a web-based interactive computational environment, usually in a notebook format, for Julia, Python and R (this is also how the name Jupyter is derived from). You can install all the related packages at your conda environment including R and the R-kernel for JupyterLab, and afterwards you can start JupyterLab at the server running as a web server and then access it via browser on your local computer. And, with the help of the "[Jupyter on Euler](https://gitlab.ethz.ch/sfux/Jupyter-on-Euler-or-Leonhard-Open)" project, you can even do it at Euler.
 
 #### Install required R packages
 In the following analysis of the RNA-seq data, we need several additional R packages which are not preinstalled together with R. The following script should be able to install them. In the R console (either at the terminal or the R console in the RStudio server), do
@@ -1148,7 +1273,7 @@ BiocManager::install(c("biomaRt","sva","DESeq2","edgeR"))
 <sub><a href="#top">(Back to top)</a></sub></br>
 To do the analysis, we need to firstly import the data we need, including the gene expression quantification of all samples, as well as the metadata information of the samples. For the gene expression values, here we are going to use the TPM values quantified by the STAR/RSEM pipeline.
 ```R
-setwd("/local0/students/hezhi")
+setwd("/local0/scratch")
 
 samples <- list.files("rsem")
 expr <- sapply(samples, function(sample){
@@ -1161,6 +1286,7 @@ expr <- sapply(samples, function(sample){
 
 >**NOTE**
 >* The `setwd` function change the working directory of R (the default directory is where you run R if you use R from the terminal, or the home directory if you use RStudio)
+>* The path `/local0/scratch` is just a mock path. Prepare your own working folder and replace it with the actual path
 >* The `list.files` function lists all the files/directories in a folder
 >* The `sapply` function is among the apply() function collection. It takes a list or vector as the input, apply the same operation (defined by a function which can be either imported from any package or fully customized) to each element, and gives output in vector or matrix if possible (all the operations result in vectors with the same length), or a list otherwise
 >* The `paste0` function pastes multiple character strings into one with no gap in between. It is a specialized version of `paste` where one can specify the characters put between the nearby strings.
@@ -1246,18 +1372,6 @@ layout(matrix(1:2, nrow=1))
 hist(avg_expr)
 hist(log10(avg_expr + 1))
 ```
-
->**NOTE**
->If you use the RStudio server at bs-studentsvr04, you may encouter the following error message
->```
->Error in RStudioGD() : 
->  Shadow graphics device error: r error 4 (Error in .External2(C_X11, paste0("png::", filename), g$width, g$height,  : 
->  unable to start device PNG
->)
->```
->In that case, try to run `options(bitmapType='cairo')`. It should then solve the problem.
-
-<p align="center"><img src="img/hist_avg_expr_base.png" /></p>
 
 >**NOTE**
 >* `rowMeans` calculates the mean per row of the given matrix and then return a vector with the same length as the row numbers. There are similar functions like `colMeans`, `rowSums`, `colSums`, which are easy to guess their functionalities
