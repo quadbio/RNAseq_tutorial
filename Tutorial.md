@@ -1,6 +1,6 @@
 # Tutorial for bulk RNA-seq data preprocessing and analysis
 #### Compiled by Zhisong He
-#### Updated on 26 Sept 2024
+#### Updated on 16 Oct 2024
 ### Table of Content
   * [Introduction](#introduction)
   * [Preparation](#preparation)
@@ -412,7 +412,7 @@ conda install --solver=libmamba -c conda-forge -c bioconda fastqc sra-tools=3.1 
 >The `--solver=libmamba` option tells conda to use the libmamba solver which is implemented in C and much faster than the classical conda solver for the environment.
 
 >***NOTE***
->Here we have to specify the version of sra-tools to be 3.1; otherwise we will get a version conflict issue.
+>Here we have to specify the version of sra-tools to be 3.1; otherwise we will get a version conflict issue later when running `prefetch` and other programs included in SRA-tools.
 
 It would ask you to confirm the installation of not only the four requested software but also all the dependencies. Once everything is finished, you can use the `which` command to make sure those tools are installed (e.g. `which STAR`).
 
