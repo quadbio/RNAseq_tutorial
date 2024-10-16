@@ -399,6 +399,20 @@ your conda is either not installed successfully, or not yet properly initialized
 
 And once you have the conda installed and set up, it would be just one command to have the remaining tools installed.
 
+By default, you are at the 'base' environment of your conda, once your conda is successfully installed, set up, and activated. Usually there is the guideline to create a new environment for the task and not to touch the base environment. This would make the environments easier to manage. To create a new environment, do
+```console
+conda create -n systems_genomics
+```
+
+Next, you shall activate the environment you just created with
+```console
+conda activate systems_genomics
+```
+
+>***NOTE***
+>By default, the 'base' environment of your conda is activated once you log on the server. Please make sure to activate the environment you want to use before using/installing/updating/removing software and packages. If you want to know more information about conda environment management, check the [conda documentation](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
+
+Once the environment you would like to work with is activated, you can install the packages as followed:
 ```console
 conda install --solver=libmamba -c conda-forge -c bioconda cutadapt star kallisto samtools rsem
 ```
